@@ -778,9 +778,10 @@ async function fetchJson(url, options = {}) {
   const response = await fetch(url, options);
   if (!response.ok) {
     const payload = await response.json().catch(() => ({}));
-    const detail = payload.error ? `: ${payload.error}` : "";
+    const detail = payload.error ?? payload.message;
+    const detailText = detail ? `: ${detail}` : "";
     const stage = payload.stage ? ` [${payload.stage}]` : "";
-    throw new Error(`データ取得に失敗しました (${response.status})${stage}${detail} @ ${new URL(url).pathname}`);
+    throw new Error(`データ取得に失敗しました (${response.status})${stage}${detailText} @ ${new URL(url).pathname}`);
   }
   const text = await response.text();
   return text ? JSON.parse(text) : null;
