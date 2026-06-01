@@ -169,24 +169,24 @@ Deno.serve(async (request) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
     );
     const { error } = await supabase
-      .from("quarterly_results")
+      .from("earn_quarterly_results")
       .upsert(source.results, { onConflict: "company_code,fiscal_year,quarter" });
     if (error) throw error;
 
     const { error: annualFlowError } = await supabase
-      .from("annual_profit_flows")
+      .from("earn_annual_profit_flows")
       .upsert(source.annualFlow, { onConflict: "company_code,current_fiscal_year" });
     if (annualFlowError) throw annualFlowError;
 
     const syncedAt = new Date().toISOString();
     const { error: companyError } = await supabase
-      .from("companies")
+      .from("earn_companies")
       .update({ last_synced_at: syncedAt })
       .eq("code", companyCode);
     if (companyError) throw companyError;
 
     const { data, error: readError } = await supabase
-      .from("quarterly_results")
+      .from("earn_quarterly_results")
       .select("*")
       .eq("company_code", companyCode)
       .order("period_end", { ascending: true });

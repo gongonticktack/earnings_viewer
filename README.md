@@ -28,6 +28,8 @@ python -m http.server 5173
 3. 直下の `sync-earnings.ts` を `sync-earnings` という名前の Edge Function としてデプロイします。
 4. `supabase-config.json` に接続情報を設定します。
 
+テーブル名は他アプリとの同居を考慮して `earn_` 接頭辞で統一しています。以前の接頭辞なしテーブルは `schema.sql` 実行時に削除されません。
+
 ## 更新タイミング
 
 定期実行ジョブは使用しません。ページを開いたときと会社を切り替えたときに、選択中の会社だけを確認します。

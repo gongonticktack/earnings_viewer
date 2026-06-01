@@ -572,12 +572,12 @@ async function loadCachedCompanyData(companyCode, config) {
   const baseUrl = `${config.supabaseUrl}/rest/v1`;
   const headers = apiHeaders(config);
   const [companiesData, resultsData, flowsData] = await Promise.all([
-    fetchJson(`${baseUrl}/companies?code=eq.${companyCode}&select=last_synced_at`, { headers }),
-    fetchJson(`${baseUrl}/quarterly_results?company_code=eq.${companyCode}&select=*&order=period_end.asc`, {
+    fetchJson(`${baseUrl}/earn_companies?code=eq.${companyCode}&select=last_synced_at`, { headers }),
+    fetchJson(`${baseUrl}/earn_quarterly_results?company_code=eq.${companyCode}&select=*&order=period_end.asc`, {
       headers,
     }),
     fetchJson(
-      `${baseUrl}/annual_profit_flows?company_code=eq.${companyCode}&select=*&order=synced_at.desc&limit=1`,
+      `${baseUrl}/earn_annual_profit_flows?company_code=eq.${companyCode}&select=*&order=synced_at.desc&limit=1`,
       { headers },
     ),
   ]);
