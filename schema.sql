@@ -3,8 +3,12 @@ create table if not exists public.companies (
   name text not null,
   stock_code text not null,
   ir_url text not null,
-  active boolean not null default true
+  active boolean not null default true,
+  last_synced_at timestamptz
 );
+
+alter table public.companies
+  add column if not exists last_synced_at timestamptz;
 
 insert into public.companies (code, name, stock_code, ir_url)
 values

@@ -178,6 +178,13 @@ Deno.serve(async (request) => {
       .upsert(source.annualFlow, { onConflict: "company_code,current_fiscal_year" });
     if (annualFlowError) throw annualFlowError;
 
+    const syncedAt = new Date().toISOString();
+    const { error: companyError } = await supabase
+      .from("companies")
+      .update({ last_synced_at: syncedAt })
+      .eq("code", companyCode);
+    if (companyError) throw companyError;
+
     const { data, error: readError } = await supabase
       .from("quarterly_results")
       .select("*")
@@ -187,6 +194,7 @@ Deno.serve(async (request) => {
 
     return new Response(JSON.stringify({
       synced: source.results.length,
+      lastSyncedAt: syncedAt,
       results: data,
       annualFlow: source.annualFlow,
     }), {

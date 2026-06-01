@@ -156,6 +156,7 @@ const state = {
   resultsByCompany: { ...fallbackResults },
   results: fallbackResults.toyota,
   activeId: fallbackResults.toyota.at(-1).id,
+  lastSyncedAtByCompany: {},
 };
 
 const elements = {
@@ -535,46 +536,102 @@ function showToast(message) {
   window.setTimeout(() => elements.toast.classList.remove("show"), 3300);
 }
 
-async function syncResults() {
+function isOlderThanThreeMonths(dateString) {
+  if (!dateString) return true;
+  const threshold = new Date();
+  threshold.setMonth(threshold.getMonth() - 3);
+  return new Date(dateString) < threshold;
+}
+
+function updateLatestUpdate(companyCode = state.companyCode) {
+  const syncedAt = state.lastSyncedAtByCompany[companyCode];
+  elements.latestUpdate.textContent = syncedAt
+    ? `Last updated ${new Intl.DateTimeFormat("ja-JP", {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+      }).format(new Date(syncedAt))}`
+    : "Last updated —";
+}
+
+function apiHeaders(config) {
+  return {
+    apikey: config.supabaseAnonKey,
+    Authorization: `Bearer ${config.supabaseAnonKey}`,
+    "Content-Type": "application/json",
+  };
+}
+
+async function fetchJson(url, options = {}) {
+  const response = await fetch(url, options);
+  if (!response.ok) throw new Error(`データ取得に失敗しました (${response.status})`);
+  return response.json();
+}
+
+async function loadCachedCompanyData(companyCode, config) {
+  const baseUrl = `${config.supabaseUrl}/rest/v1`;
+  const headers = apiHeaders(config);
+  const [companiesData, resultsData, flowsData] = await Promise.all([
+    fetchJson(`${baseUrl}/companies?code=eq.${companyCode}&select=last_synced_at`, { headers }),
+    fetchJson(`${baseUrl}/quarterly_results?company_code=eq.${companyCode}&select=*&order=period_end.asc`, {
+      headers,
+    }),
+    fetchJson(
+      `${baseUrl}/annual_profit_flows?company_code=eq.${companyCode}&select=*&order=synced_at.desc&limit=1`,
+      { headers },
+    ),
+  ]);
+
+  state.lastSyncedAtByCompany[companyCode] = companiesData[0]?.last_synced_at ?? null;
+  if (resultsData.length) state.resultsByCompany[companyCode] = resultsData.map(normalizeResult);
+  if (flowsData.length) annualAnalyses[companyCode] = normalizeAnnualFlow(flowsData[0]);
+  return state.lastSyncedAtByCompany[companyCode];
+}
+
+async function invokeSync(companyCode, config) {
+  const payload = await fetchJson(`${config.supabaseUrl}/functions/v1/sync-earnings`, {
+    method: "POST",
+    headers: apiHeaders(config),
+    body: JSON.stringify({ companyCode }),
+  });
+  if (Array.isArray(payload.results) && payload.results.length) {
+    state.resultsByCompany[companyCode] = payload.results.map(normalizeResult);
+  }
+  if (payload.annualFlow) annualAnalyses[companyCode] = normalizeAnnualFlow(payload.annualFlow);
+  state.lastSyncedAtByCompany[companyCode] = payload.lastSyncedAt ?? new Date().toISOString();
+  return payload;
+}
+
+async function refreshCompany({ force = false, notify = false } = {}) {
   const config = window.APP_CONFIG ?? {};
+  const companyCode = state.companyCode;
   elements.syncButton.disabled = true;
   elements.syncButton.classList.add("loading");
 
   try {
     if (!config.supabaseUrl || !config.supabaseAnonKey) {
-      await new Promise((resolve) => window.setTimeout(resolve, 650));
-      showToast("デモモード: 公式IR資料から取得済みのサンプルを表示しています。");
+      if (notify) showToast("デモモード: 保存済みのサンプルを表示しています。");
       return;
     }
 
-    const response = await fetch(`${config.supabaseUrl}/functions/v1/sync-earnings`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${config.supabaseAnonKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ companyCode: state.companyCode }),
-    });
-    if (!response.ok) throw new Error(`同期に失敗しました (${response.status})`);
+    const lastSyncedAt = await loadCachedCompanyData(companyCode, config);
+    let payload = null;
+    if (force || isOlderThanThreeMonths(lastSyncedAt)) {
+      payload = await invokeSync(companyCode, config);
+    }
 
-    const payload = await response.json();
-    if (Array.isArray(payload.results) && payload.results.length) {
-      state.results = payload.results.map(normalizeResult);
-      state.resultsByCompany[state.companyCode] = state.results;
-      if (payload.annualFlow) {
-        annualAnalyses[state.companyCode] = normalizeAnnualFlow(payload.annualFlow);
-      }
+    if (state.companyCode === companyCode) {
+      state.results = state.resultsByCompany[companyCode];
       state.activeId = state.results.at(-1).id;
+      updateLatestUpdate(companyCode);
       render();
     }
-    showToast(`${payload.synced ?? state.results.length}件の決算データを同期しました。`);
+    if (notify || payload) {
+      showToast(payload ? `${payload.synced}件の決算データを再取得しました。` : "保存済みの最新データを表示しています。");
+    }
   } catch (error) {
     showToast(error.message);
   } finally {
-    elements.latestUpdate.textContent = `Last updated ${new Intl.DateTimeFormat("ja-JP", {
-      hour: "2-digit",
-      minute: "2-digit",
-    }).format(new Date())}`;
     elements.syncButton.disabled = false;
     elements.syncButton.classList.remove("loading");
   }
@@ -616,18 +673,18 @@ elements.quarterSelect.addEventListener("change", (event) => {
   renderDocuments();
 });
 elements.companyButtons.forEach((button) => {
-  button.addEventListener("click", () => {
+  button.addEventListener("click", async () => {
     state.companyCode = button.dataset.company;
     state.results = state.resultsByCompany[state.companyCode];
     state.activeId = state.results.at(-1).id;
+    updateLatestUpdate();
     render();
+    await refreshCompany();
   });
 });
-elements.syncButton.addEventListener("click", syncResults);
+elements.syncButton.addEventListener("click", () => refreshCompany({ force: true, notify: true }));
 window.addEventListener("resize", renderCharts);
 
-elements.latestUpdate.textContent = `Last updated ${new Intl.DateTimeFormat("ja-JP", {
-  hour: "2-digit",
-  minute: "2-digit",
-}).format(new Date())}`;
+updateLatestUpdate();
 render();
+refreshCompany();

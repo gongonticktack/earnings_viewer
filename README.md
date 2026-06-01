@@ -24,15 +24,17 @@ python -m http.server 5173
 ## Supabase 接続
 
 1. Supabase プロジェクトを作成します。
-2. SQL Editor で `supabase/schema.sql` を実行します。
-3. Edge Function をデプロイします。
-
-```powershell
-supabase functions deploy sync-earnings
-```
-
+2. SQL Editor で直下の `schema.sql` を実行します。
+3. 直下の `sync-earnings.ts` を `sync-earnings` という名前の Edge Function としてデプロイします。
 4. `supabase-config.json` に接続情報を設定します。
-5. 定期同期を有効にする場合は `supabase/schedule.sql` のプレースホルダーを置換し、SQL Editor で実行します。
+
+## 更新タイミング
+
+定期実行ジョブは使用しません。ページを開いたときと会社を切り替えたときに、選択中の会社だけを確認します。
+
+- 前回取得から3か月未満: DBに保存済みのデータを表示します。
+- 前回取得から3か月以上、または初回取得: 公式IRページを確認し、DBを更新してから表示します。
+- `今すぐ再取得`: 3か月の経過を待たず、表示中の会社だけを再取得します。
 
 ## データの扱い
 
@@ -41,4 +43,4 @@ supabase functions deploy sync-earnings
 - 公式資料の累計値から前四半期累計を差し引き、四半期単独値を保存しています。
 - 営業コストは `営業収益 - 営業利益` の算出値です。
 
-現在の Edge Function はトヨタ FY2026、NTT FY2025 の公式IRページを定期確認し、登録済みの四半期データを取り込みます。新しい決算発表を完全自動で解析して追加する場合は、PDF本文を構造化する抽出処理または XBRL 連携を追加してください。
+現在の Edge Function はトヨタ FY2026、NTT FY2025 の公式IRページをオンデマンドで確認し、登録済みの四半期データを取り込みます。新しい決算発表を完全自動で解析して追加する場合は、PDF本文を構造化する抽出処理または XBRL 連携を追加してください。
