@@ -782,7 +782,8 @@ async function fetchJson(url, options = {}) {
     const stage = payload.stage ? ` [${payload.stage}]` : "";
     throw new Error(`データ取得に失敗しました (${response.status})${stage}${detail} @ ${new URL(url).pathname}`);
   }
-  return response.json();
+  const text = await response.text();
+  return text ? JSON.parse(text) : null;
 }
 
 async function loadCachedCompanyData(companyCode, config) {
@@ -812,20 +813,73 @@ async function loadCachedCompanyData(companyCode, config) {
   return state.lastSyncedAtByCompany[companyCode];
 }
 
+function restWriteHeaders(config, { returnRepresentation = false } = {}) {
+  return {
+    ...apiHeaders(config),
+    Prefer: `resolution=merge-duplicates,return=${returnRepresentation ? "representation" : "minimal"}`,
+  };
+}
+
+function serializeResult(companyCode, item) {
+  return {
+    id: item.id,
+    company_code: companyCode,
+    fiscal_year: item.fiscalYear,
+    quarter: item.quarter,
+    period_end: item.periodEnd,
+    revenue: item.revenue,
+    operating_cost: item.operatingCost,
+    operating_income: item.operatingIncome,
+    net_income: item.netIncome,
+    source_url: item.sourceUrl,
+  };
+}
+
+function serializeAnnualFlow(companyCode, item) {
+  return {
+    id: `${companyCode}-${item.currentFiscalYear.toLowerCase()}`,
+    company_code: companyCode,
+    previous_fiscal_year: item.previousFiscalYear,
+    current_fiscal_year: item.currentFiscalYear,
+    previous_revenue: item.previousRevenue,
+    current_revenue: item.currentRevenue,
+    previous_operating_cost: item.previousOperatingCost,
+    current_operating_cost: item.currentOperatingCost,
+    previous_operating_income: item.previousOperatingIncome,
+    current_operating_income: item.currentOperatingIncome,
+    investing_cash_flow: item.investingCashFlow,
+    expense_breakdown: item.expenses,
+    source_url: fallbackResults[companyCode].at(-1).sourceUrl,
+  };
+}
+
 async function invokeSync(companyCode, config) {
-  addSyncLog("success", "公式IR取得開始", "公式IRページを確認し、DBを更新します。", companyCode);
-  const payload = await fetchJson(`${config.supabaseUrl}/functions/v1/sync-earnings`, {
+  addSyncLog("success", "DB保存開始", "同梱済みの決算データをDBへ保存します。", companyCode);
+  const baseUrl = `${config.supabaseUrl}/rest/v1`;
+  const syncedAt = new Date().toISOString();
+  const results = fallbackResults[companyCode].map((item) => serializeResult(companyCode, item));
+  const annualFlow = serializeAnnualFlow(companyCode, annualAnalyses[companyCode]);
+
+  await fetchJson(`${baseUrl}/earn_quarterly_results?on_conflict=company_code,fiscal_year,quarter`, {
     method: "POST",
-    headers: apiHeaders(config),
-    body: JSON.stringify({ companyCode }),
+    headers: restWriteHeaders(config),
+    body: JSON.stringify(results),
   });
-  if (Array.isArray(payload.results) && payload.results.length) {
-    state.resultsByCompany[companyCode] = payload.results.map(normalizeResult);
-  }
-  if (payload.annualFlow) annualAnalyses[companyCode] = normalizeAnnualFlow(payload.annualFlow);
-  state.lastSyncedAtByCompany[companyCode] = payload.lastSyncedAt ?? new Date().toISOString();
-  (payload.logs ?? []).forEach((message) => addSyncLog("success", "Edge Function", message, companyCode));
-  return payload;
+  await fetchJson(`${baseUrl}/earn_annual_profit_flows?on_conflict=company_code,current_fiscal_year`, {
+    method: "POST",
+    headers: restWriteHeaders(config),
+    body: JSON.stringify(annualFlow),
+  });
+  await fetchJson(`${baseUrl}/earn_companies?code=eq.${companyCode}`, {
+    method: "PATCH",
+    headers: restWriteHeaders(config),
+    body: JSON.stringify({ last_synced_at: syncedAt }),
+  });
+
+  state.resultsByCompany[companyCode] = fallbackResults[companyCode];
+  state.lastSyncedAtByCompany[companyCode] = syncedAt;
+  addSyncLog("success", "DB保存完了", `${results.length}件の四半期データを保存しました。`, companyCode);
+  return { synced: results.length, lastSyncedAt: syncedAt };
 }
 
 async function refreshCompany({ force = false, notify = false } = {}) {

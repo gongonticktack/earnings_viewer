@@ -30,6 +30,17 @@ create policy "Earn companies are public"
   to anon, authenticated
   using (true);
 
+drop policy if exists "Earn companies can update sync time" on public.earn_companies;
+create policy "Earn companies can update sync time"
+  on public.earn_companies
+  for update
+  to anon, authenticated
+  using (true)
+  with check (true);
+
+revoke update on public.earn_companies from anon, authenticated;
+grant update (last_synced_at) on public.earn_companies to anon, authenticated;
+
 create table if not exists public.earn_quarterly_results (
   id text primary key,
   company_code text not null references public.earn_companies(code),
@@ -53,6 +64,23 @@ create policy "Earn quarterly results are public"
   for select
   to anon, authenticated
   using (true);
+
+drop policy if exists "Earn quarterly results can be inserted" on public.earn_quarterly_results;
+create policy "Earn quarterly results can be inserted"
+  on public.earn_quarterly_results
+  for insert
+  to anon, authenticated
+  with check (true);
+
+drop policy if exists "Earn quarterly results can be updated" on public.earn_quarterly_results;
+create policy "Earn quarterly results can be updated"
+  on public.earn_quarterly_results
+  for update
+  to anon, authenticated
+  using (true)
+  with check (true);
+
+grant insert, update on public.earn_quarterly_results to anon, authenticated;
 
 create index if not exists earn_quarterly_results_period_end_idx
   on public.earn_quarterly_results (period_end desc);
@@ -83,3 +111,20 @@ create policy "Earn annual profit flows are public"
   for select
   to anon, authenticated
   using (true);
+
+drop policy if exists "Earn annual profit flows can be inserted" on public.earn_annual_profit_flows;
+create policy "Earn annual profit flows can be inserted"
+  on public.earn_annual_profit_flows
+  for insert
+  to anon, authenticated
+  with check (true);
+
+drop policy if exists "Earn annual profit flows can be updated" on public.earn_annual_profit_flows;
+create policy "Earn annual profit flows can be updated"
+  on public.earn_annual_profit_flows
+  for update
+  to anon, authenticated
+  using (true)
+  with check (true);
+
+grant insert, update on public.earn_annual_profit_flows to anon, authenticated;
