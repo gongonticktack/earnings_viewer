@@ -8,6 +8,10 @@
 
 - トヨタ自動車
 - NTT
+- 東芝
+- ソフトバンク
+
+各社とも直近2年度分の四半期データを表示します。
 
 ## ローカル表示
 
@@ -38,11 +42,13 @@ python -m http.server 5173
 - 前回取得から3か月以上、または初回取得: 公式IRページを確認し、DBを更新してから表示します。
 - `今すぐ再取得`: 3か月の経過を待たず、表示中の会社だけを再取得します。
 
+画面下部の `Sync Log` には、DB読込、鮮度確認、公式IR取得、DB保存の結果が残ります。失敗時はエラーになった段階とレスポンス内容を確認できます。
+
 ## データの扱い
 
-- 出典は [トヨタ自動車 決算資料](https://global.toyota/jp/ir/financial-results/) と [NTT 決算説明会資料](https://group.ntt/jp/ir/library/presentation/financial/) です。
+- 出典は [トヨタ自動車 決算資料](https://global.toyota/jp/ir/financial-results/)、[NTT 決算説明会資料](https://group.ntt/jp/ir/library/presentation/financial/)、[東芝 財務・業績](https://www.global.toshiba/jp/ir/corporate/finance.html)、[ソフトバンク 決算短信](https://www.softbank.jp/corp/ir/documents/financial_reports/) です。
 - 表示単位は百万円です。カードでは十億円へ変換しています。
 - 公式資料の累計値から前四半期累計を差し引き、四半期単独値を保存しています。
 - 営業コストは `営業収益 - 営業利益` の算出値です。
 
-現在の Edge Function はトヨタ FY2026、NTT FY2025 の公式IRページをオンデマンドで確認し、登録済みの四半期データを取り込みます。新しい決算発表を完全自動で解析して追加する場合は、PDF本文を構造化する抽出処理または XBRL 連携を追加してください。
+現在の Edge Function はトヨタ FY2025〜FY2026、NTT FY2024〜FY2025、東芝 FY2024〜FY2025、ソフトバンク FY2024〜FY2025 の公式IRページをオンデマンドで確認し、登録済みの四半期データを取り込みます。新しい決算発表を完全自動で解析して追加する場合は、PDF本文を構造化する抽出処理または XBRL 連携を追加してください。

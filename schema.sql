@@ -13,7 +13,9 @@ alter table public.earn_companies
 insert into public.earn_companies (code, name, stock_code, ir_url)
 values
   ('toyota', 'トヨタ自動車', '7203', 'https://global.toyota/jp/ir/financial-results/'),
-  ('ntt', 'NTT', '9432', 'https://group.ntt/jp/ir/library/presentation/financial/')
+  ('ntt', 'NTT', '9432', 'https://group.ntt/jp/ir/library/presentation/financial/'),
+  ('toshiba', '東芝', 'PRIVATE', 'https://www.global.toshiba/jp/ir/corporate/finance.html'),
+  ('softbank', 'ソフトバンク', '9434', 'https://www.softbank.jp/corp/ir/documents/financial_reports/')
 on conflict (code) do update set
   name = excluded.name,
   stock_code = excluded.stock_code,

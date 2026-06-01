@@ -11,11 +11,43 @@ const companies = {
     sourceName: "NTT IR",
     sourcePage: "https://group.ntt/jp/ir/library/presentation/financial/",
   },
+  toshiba: {
+    code: "toshiba",
+    name: "TOSHIBA CORPORATION",
+    sourceName: "TOSHIBA IR",
+    sourcePage: "https://www.global.toshiba/jp/ir/corporate/finance.html",
+  },
+  softbank: {
+    code: "softbank",
+    name: "SOFTBANK CORP.",
+    sourceName: "SOFTBANK IR",
+    sourcePage: "https://www.softbank.jp/corp/ir/documents/financial_reports/",
+  },
 };
 
 // Official PDFs publish cumulative values. Each entry below is normalized to a standalone quarter.
 const fallbackResults = {
   toyota: [
+  {
+    id: "fy2025-q1", fiscalYear: 2025, quarter: 1, periodEnd: "2024-06-30",
+    revenue: 11837879, operatingCost: 10529417, operatingIncome: 1308462, netIncome: 1333347,
+    sourceUrl: "https://global.toyota/pages/global_toyota/ir/financial-results/2025_1q_summary_jp.pdf",
+  },
+  {
+    id: "fy2025-q2", fiscalYear: 2025, quarter: 2, periodEnd: "2024-09-30",
+    revenue: 11444571, operatingCost: 10288816, operatingIncome: 1155755, netIncome: 573766,
+    sourceUrl: "https://global.toyota/pages/global_toyota/ir/financial-results/2025_2q_summary_jp.pdf",
+  },
+  {
+    id: "fy2025-q3", fiscalYear: 2025, quarter: 3, periodEnd: "2024-12-31",
+    revenue: 12391095, operatingCost: 11175821, operatingIncome: 1215274, netIncome: 2193276,
+    sourceUrl: "https://global.toyota/pages/global_toyota/ir/financial-results/2025_3q_summary_jp.pdf",
+  },
+  {
+    id: "fy2025-q4", fiscalYear: 2025, quarter: 4, periodEnd: "2025-03-31",
+    revenue: 12363159, operatingCost: 11247064, operatingIncome: 1116095, netIncome: 664697,
+    sourceUrl: "https://global.toyota/pages/global_toyota/ir/financial-results/2025_4q_summary_jp.pdf",
+  },
   {
     id: "fy2026-q1",
     fiscalYear: 2026,
@@ -67,6 +99,26 @@ const fallbackResults = {
   ],
   ntt: [
     {
+      id: "ntt-fy2024-q1", fiscalYear: 2024, quarter: 1, periodEnd: "2024-06-30",
+      revenue: 3240023, operatingCost: 2804206, operatingIncome: 435817, netIncome: 274136,
+      sourceUrl: "https://group.ntt/jp/newsrelease/2025/08/06/pdf/250806ab.pdf",
+    },
+    {
+      id: "ntt-fy2024-q2", fiscalYear: 2024, quarter: 2, periodEnd: "2024-09-30",
+      revenue: 3350602, operatingCost: 2866164, operatingIncome: 484438, netIncome: 280656,
+      sourceUrl: "https://group.ntt/jp/newsrelease/2025/11/04/pdf/251104ab.pdf",
+    },
+    {
+      id: "ntt-fy2024-q3", fiscalYear: 2024, quarter: 3, periodEnd: "2024-12-31",
+      revenue: 3459099, operatingCost: 2980121, operatingIncome: 478978, netIncome: 295899,
+      sourceUrl: "https://group.ntt/jp/newsrelease/2026/02/05/pdf/260205ab.pdf",
+    },
+    {
+      id: "ntt-fy2024-q4", fiscalYear: 2024, quarter: 4, periodEnd: "2025-03-31",
+      revenue: 3655003, operatingCost: 3404665, operatingIncome: 250338, netIncome: 149325,
+      sourceUrl: "https://group.ntt/jp/newsrelease/2026/05/08/pdf/260508ab.pdf",
+    },
+    {
       id: "ntt-fy2025-q1",
       fiscalYear: 2025,
       quarter: 1,
@@ -111,6 +163,90 @@ const fallbackResults = {
       sourceUrl: "https://group.ntt/jp/newsrelease/2026/05/08/pdf/260508ab.pdf",
     },
   ],
+  toshiba: [
+    {
+      id: "toshiba-fy2024-q1", fiscalYear: 2024, quarter: 1, periodEnd: "2024-06-30",
+      revenue: 749100, operatingCost: 734800, operatingIncome: 14300, netIncome: 38300,
+      sourceUrl: "https://www.global.toshiba/content/dam/toshiba/jp/ir/corporate/finance/pdf/tpr2024q1.pdf",
+    },
+    {
+      id: "toshiba-fy2024-q2", fiscalYear: 2024, quarter: 2, periodEnd: "2024-09-30",
+      revenue: 872800, operatingCost: 816600, operatingIncome: 56200, netIncome: 78000,
+      sourceUrl: "https://www.global.toshiba/content/dam/toshiba/jp/ir/corporate/finance/pdf/tpr2024q2.pdf",
+    },
+    {
+      id: "toshiba-fy2024-q3", fiscalYear: 2024, quarter: 3, periodEnd: "2024-12-31",
+      revenue: 855100, operatingCost: 811300, operatingIncome: 43800, netIncome: 68500,
+      sourceUrl: "https://www.global.toshiba/content/dam/toshiba/jp/ir/corporate/finance/pdf/tpr2024q3.pdf",
+    },
+    {
+      id: "toshiba-fy2024-q4", fiscalYear: 2024, quarter: 4, periodEnd: "2025-03-31",
+      revenue: 1036900, operatingCost: 952700, operatingIncome: 84200, netIncome: 94200,
+      sourceUrl: "https://www.global.toshiba/content/dam/toshiba/jp/ir/corporate/finance/pdf/tpr2024q4.pdf",
+    },
+    {
+      id: "toshiba-fy2025-q1", fiscalYear: 2025, quarter: 1, periodEnd: "2025-06-30",
+      revenue: 737900, operatingCost: 697800, operatingIncome: 40100, netIncome: 146900,
+      sourceUrl: "https://www.global.toshiba/content/dam/toshiba/jp/ir/corporate/finance/pdf/tpr2025q1.pdf",
+    },
+    {
+      id: "toshiba-fy2025-q2", fiscalYear: 2025, quarter: 2, periodEnd: "2025-09-30",
+      revenue: 875900, operatingCost: 800600, operatingIncome: 75300, netIncome: 169100,
+      sourceUrl: "https://www.global.toshiba/content/dam/toshiba/jp/ir/corporate/finance/pdf/tpr2025q2.pdf",
+    },
+    {
+      id: "toshiba-fy2025-q3", fiscalYear: 2025, quarter: 3, periodEnd: "2025-12-31",
+      revenue: 908200, operatingCost: 808900, operatingIncome: 99300, netIncome: 183200,
+      sourceUrl: "https://www.global.toshiba/content/dam/toshiba/jp/ir/corporate/finance/pdf/tpr2025q3.pdf",
+    },
+    {
+      id: "toshiba-fy2025-q4", fiscalYear: 2025, quarter: 4, periodEnd: "2026-03-31",
+      revenue: 1187100, operatingCost: 1101000, operatingIncome: 86100, netIncome: 1468100,
+      sourceUrl: "https://www.global.toshiba/content/dam/toshiba/jp/ir/corporate/finance/pdf/tpr2025q4.pdf",
+    },
+  ],
+  softbank: [
+    {
+      id: "softbank-fy2024-q1", fiscalYear: 2024, quarter: 1, periodEnd: "2024-06-30",
+      revenue: 1535722, operatingCost: 1231795, operatingIncome: 303927, netIncome: 162510,
+      sourceUrl: "https://www.softbank.jp/corp/set/data/ir/documents/financial_reports/fy2025/pdf/sbkk_financial_report_20250805.pdf",
+    },
+    {
+      id: "softbank-fy2024-q2", fiscalYear: 2024, quarter: 2, periodEnd: "2024-09-30",
+      revenue: 1616357, operatingCost: 1334395, operatingIncome: 281962, netIncome: 161347,
+      sourceUrl: "https://www.softbank.jp/corp/set/data/ir/documents/financial_reports/fy2025/pdf/sbkk_financial_report_20251105.pdf",
+    },
+    {
+      id: "softbank-fy2024-q3", fiscalYear: 2024, quarter: 3, periodEnd: "2024-12-31",
+      revenue: 1659384, operatingCost: 1423412, operatingIncome: 235972, netIncome: 112753,
+      sourceUrl: "https://www.softbank.jp/corp/set/data/ir/documents/financial_reports/fy2025/pdf/sbkk_financial_report_20260209.pdf",
+    },
+    {
+      id: "softbank-fy2024-q4", fiscalYear: 2024, quarter: 4, periodEnd: "2025-03-31",
+      revenue: 1732886, operatingCost: 1565731, operatingIncome: 167155, netIncome: 89523,
+      sourceUrl: "https://www.softbank.jp/corp/set/data/ir/documents/financial_reports/fy2025/pdf/sbkk_financial_report_20260511.pdf",
+    },
+    {
+      id: "softbank-fy2025-q1", fiscalYear: 2025, quarter: 1, periodEnd: "2025-06-30",
+      revenue: 1658615, operatingCost: 1367881, operatingIncome: 290734, netIncome: 145310,
+      sourceUrl: "https://www.softbank.jp/corp/set/data/ir/documents/financial_reports/fy2025/pdf/sbkk_financial_report_20250805.pdf",
+    },
+    {
+      id: "softbank-fy2025-q2", fiscalYear: 2025, quarter: 2, periodEnd: "2025-09-30",
+      revenue: 1742220, operatingCost: 1404060, operatingIncome: 338160, netIncome: 203445,
+      sourceUrl: "https://www.softbank.jp/corp/set/data/ir/documents/financial_reports/fy2025/pdf/sbkk_financial_report_20251105.pdf",
+    },
+    {
+      id: "softbank-fy2025-q3", fiscalYear: 2025, quarter: 3, periodEnd: "2025-12-31",
+      revenue: 1794564, operatingCost: 1539314, operatingIncome: 255250, netIncome: 136768,
+      sourceUrl: "https://www.softbank.jp/corp/set/data/ir/documents/financial_reports/fy2025/pdf/sbkk_financial_report_20260209.pdf",
+    },
+    {
+      id: "softbank-fy2025-q4", fiscalYear: 2025, quarter: 4, periodEnd: "2026-03-31",
+      revenue: 1843281, operatingCost: 1684849, operatingIncome: 158432, netIncome: 65236,
+      sourceUrl: "https://www.softbank.jp/corp/set/data/ir/documents/financial_reports/fy2025/pdf/sbkk_financial_report_20260511.pdf",
+    },
+  ],
 };
 
 const annualAnalyses = {
@@ -149,6 +285,30 @@ const annualAnalyses = {
       { label: "租税公課", value: 289141 },
     ],
   },
+  toshiba: {
+    previousFiscalYear: "FY2024",
+    currentFiscalYear: "FY2025",
+    previousOperatingIncome: 198500,
+    currentOperatingIncome: 300800,
+    previousRevenue: 3513900,
+    currentRevenue: 3709100,
+    previousOperatingCost: 3315400,
+    currentOperatingCost: 3408300,
+    investingCashFlow: 736400,
+    expenses: [{ label: "営業費用合計", value: 3408300 }],
+  },
+  softbank: {
+    previousFiscalYear: "FY2024",
+    currentFiscalYear: "FY2025",
+    previousOperatingIncome: 989016,
+    currentOperatingIncome: 1042576,
+    previousRevenue: 6544349,
+    currentRevenue: 7038680,
+    previousOperatingCost: 5555333,
+    currentOperatingCost: 5996104,
+    investingCashFlow: -1270806,
+    expenses: [{ label: "営業費用合計", value: 5996104 }],
+  },
 };
 
 const state = {
@@ -157,6 +317,7 @@ const state = {
   results: fallbackResults.toyota,
   activeId: fallbackResults.toyota.at(-1).id,
   lastSyncedAtByCompany: {},
+  syncLogs: [],
 };
 
 const elements = {
@@ -175,6 +336,8 @@ const elements = {
   flowPeriod: document.querySelector("#flow-period"),
   investmentCashFlow: document.querySelector("#investment-cash-flow"),
   expenseList: document.querySelector("#expense-list"),
+  syncLogList: document.querySelector("#sync-log-list"),
+  logClearButton: document.querySelector("#log-clear-button"),
 };
 
 const metricIds = ["revenue", "cost", "operating", "net"];
@@ -212,6 +375,10 @@ function formatDate(dateString) {
 
 function quarterLabel(result) {
   return `FY${result.fiscalYear} Q${result.quarter}`;
+}
+
+function chartQuarterLabel(result) {
+  return `FY${String(result.fiscalYear).slice(-2)} Q${result.quarter}`;
 }
 
 function activeResult() {
@@ -330,7 +497,7 @@ function drawPerformanceChart() {
 
     ctx.fillStyle = "#77756e";
     ctx.textAlign = "center";
-    ctx.fillText(`Q${result.quarter}`, x, height - 7);
+    ctx.fillText(chartQuarterLabel(result), x, height - 7);
 
     const profitY = padding.top + chartHeight - (result.operatingIncome / maxProfit) * chartHeight;
     points.push({ x, y: profitY });
@@ -410,7 +577,7 @@ function drawMarginChart() {
     ctx.fillStyle = "#77756e";
     ctx.textAlign = "center";
     ctx.font = '600 9px "Manrope"';
-    ctx.fillText(`Q${state.results[index].quarter}`, point.x, height - 7);
+    ctx.fillText(chartQuarterLabel(state.results[index]), point.x, height - 7);
   });
 }
 
@@ -543,6 +710,51 @@ function isOlderThanThreeMonths(dateString) {
   return new Date(dateString) < threshold;
 }
 
+function addSyncLog(level, stage, message, companyCode = state.companyCode) {
+  state.syncLogs.unshift({
+    level,
+    stage,
+    message,
+    companyCode,
+    timestamp: new Date(),
+  });
+  state.syncLogs = state.syncLogs.slice(0, 30);
+  renderSyncLogs();
+}
+
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+function renderSyncLogs() {
+  if (!state.syncLogs.length) {
+    elements.syncLogList.innerHTML = '<p class="sync-log-empty">まだ同期処理は実行されていません。</p>';
+    return;
+  }
+  elements.syncLogList.innerHTML = state.syncLogs
+    .map(
+      (log) => `
+        <article class="sync-log-entry ${log.level}">
+          <span class="sync-log-status">${log.level === "error" ? "FAILED" : "SUCCESS"}</span>
+          <span class="sync-log-time">${new Intl.DateTimeFormat("ja-JP", {
+            hour: "2-digit",
+            minute: "2-digit",
+            second: "2-digit",
+          }).format(log.timestamp)}</span>
+          <strong>${escapeHtml(companies[log.companyCode]?.sourceName ?? log.companyCode)}</strong>
+          <small>${escapeHtml(log.stage)}</small>
+          <p>${escapeHtml(log.message)}</p>
+        </article>
+      `,
+    )
+    .join("");
+}
+
 function updateLatestUpdate(companyCode = state.companyCode) {
   const syncedAt = state.lastSyncedAtByCompany[companyCode];
   elements.latestUpdate.textContent = syncedAt
@@ -564,11 +776,17 @@ function apiHeaders(config) {
 
 async function fetchJson(url, options = {}) {
   const response = await fetch(url, options);
-  if (!response.ok) throw new Error(`データ取得に失敗しました (${response.status})`);
+  if (!response.ok) {
+    const payload = await response.json().catch(() => ({}));
+    const detail = payload.error ? `: ${payload.error}` : "";
+    const stage = payload.stage ? ` [${payload.stage}]` : "";
+    throw new Error(`データ取得に失敗しました (${response.status})${stage}${detail} @ ${new URL(url).pathname}`);
+  }
   return response.json();
 }
 
 async function loadCachedCompanyData(companyCode, config) {
+  addSyncLog("success", "DB読込開始", "保存済みデータと前回取得日時を確認します。", companyCode);
   const baseUrl = `${config.supabaseUrl}/rest/v1`;
   const headers = apiHeaders(config);
   const [companiesData, resultsData, flowsData] = await Promise.all([
@@ -585,10 +803,17 @@ async function loadCachedCompanyData(companyCode, config) {
   state.lastSyncedAtByCompany[companyCode] = companiesData[0]?.last_synced_at ?? null;
   if (resultsData.length) state.resultsByCompany[companyCode] = resultsData.map(normalizeResult);
   if (flowsData.length) annualAnalyses[companyCode] = normalizeAnnualFlow(flowsData[0]);
+  addSyncLog(
+    "success",
+    "DB読込完了",
+    `${resultsData.length}件の四半期データを読み込みました。`,
+    companyCode,
+  );
   return state.lastSyncedAtByCompany[companyCode];
 }
 
 async function invokeSync(companyCode, config) {
+  addSyncLog("success", "公式IR取得開始", "公式IRページを確認し、DBを更新します。", companyCode);
   const payload = await fetchJson(`${config.supabaseUrl}/functions/v1/sync-earnings`, {
     method: "POST",
     headers: apiHeaders(config),
@@ -599,6 +824,7 @@ async function invokeSync(companyCode, config) {
   }
   if (payload.annualFlow) annualAnalyses[companyCode] = normalizeAnnualFlow(payload.annualFlow);
   state.lastSyncedAtByCompany[companyCode] = payload.lastSyncedAt ?? new Date().toISOString();
+  (payload.logs ?? []).forEach((message) => addSyncLog("success", "Edge Function", message, companyCode));
   return payload;
 }
 
@@ -610,6 +836,7 @@ async function refreshCompany({ force = false, notify = false } = {}) {
 
   try {
     if (!config.supabaseUrl || !config.supabaseAnonKey) {
+      addSyncLog("success", "デモモード", "Supabase未接続のため、同梱サンプルを表示しました。", companyCode);
       if (notify) showToast("デモモード: 保存済みのサンプルを表示しています。");
       return;
     }
@@ -618,6 +845,8 @@ async function refreshCompany({ force = false, notify = false } = {}) {
     let payload = null;
     if (force || isOlderThanThreeMonths(lastSyncedAt)) {
       payload = await invokeSync(companyCode, config);
+    } else {
+      addSyncLog("success", "鮮度確認", "前回取得から3か月未満のため、DBのデータを使用します。", companyCode);
     }
 
     if (state.companyCode === companyCode) {
@@ -630,6 +859,7 @@ async function refreshCompany({ force = false, notify = false } = {}) {
       showToast(payload ? `${payload.synced}件の決算データを再取得しました。` : "保存済みの最新データを表示しています。");
     }
   } catch (error) {
+    addSyncLog("error", "同期失敗", error.message, companyCode);
     showToast(error.message);
   } finally {
     elements.syncButton.disabled = false;
@@ -683,6 +913,10 @@ elements.companyButtons.forEach((button) => {
   });
 });
 elements.syncButton.addEventListener("click", () => refreshCompany({ force: true, notify: true }));
+elements.logClearButton.addEventListener("click", () => {
+  state.syncLogs = [];
+  renderSyncLogs();
+});
 window.addEventListener("resize", renderCharts);
 
 updateLatestUpdate();

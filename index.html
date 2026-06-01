@@ -38,6 +38,14 @@
             <span class="company-monogram">N</span>
             <span><strong>NTT</strong><small>9432</small></span>
           </button>
+          <button class="company-button" data-company="toshiba" type="button">
+            <span class="company-monogram">T</span>
+            <span><strong>TOSHIBA</strong><small>PRIVATE</small></span>
+          </button>
+          <button class="company-button" data-company="softbank" type="button">
+            <span class="company-monogram">S</span>
+            <span><strong>SOFTBANK</strong><small>9434</small></span>
+          </button>
         </section>
 
         <nav class="side-nav" aria-label="メインナビゲーション">
@@ -239,6 +247,19 @@
               </thead>
               <tbody id="documents-body"></tbody>
             </table>
+          </div>
+        </section>
+
+        <section class="panel sync-log-panel" aria-label="同期ログ">
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">CONNECTION ACTIVITY</p>
+              <h3>Sync Log</h3>
+            </div>
+            <button class="log-clear-button" id="log-clear-button" type="button">ログを消去</button>
+          </div>
+          <div class="sync-log-list" id="sync-log-list">
+            <p class="sync-log-empty">まだ同期処理は実行されていません。</p>
           </div>
         </section>
       </main>

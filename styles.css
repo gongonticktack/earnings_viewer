@@ -607,6 +607,86 @@ select {
   margin-top: 17px;
 }
 
+.sync-log-panel {
+  margin-top: 17px;
+}
+
+.log-clear-button {
+  padding: 7px 10px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  color: var(--muted);
+  cursor: pointer;
+  background: transparent;
+  font-size: 10px;
+  transition: 160ms ease;
+}
+
+.log-clear-button:hover {
+  border-color: var(--line-strong);
+  color: var(--text);
+}
+
+.sync-log-list {
+  display: grid;
+  max-height: 260px;
+  margin-top: 15px;
+  overflow-y: auto;
+  gap: 7px;
+}
+
+.sync-log-empty {
+  padding: 14px 0;
+  color: var(--dim);
+  font-size: 11px;
+}
+
+.sync-log-entry {
+  display: grid;
+  align-items: center;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  gap: 5px 9px;
+  grid-template-columns: auto auto auto 1fr;
+  background: rgba(255, 255, 255, 0.018);
+}
+
+.sync-log-status,
+.sync-log-time,
+.sync-log-entry strong,
+.sync-log-entry small {
+  font: 700 9px/1 var(--font-display);
+  letter-spacing: 0.05em;
+}
+
+.sync-log-status {
+  padding: 3px 5px;
+  border-radius: 3px;
+  color: var(--green);
+  background: rgba(130, 186, 142, 0.1);
+}
+
+.sync-log-entry.error .sync-log-status {
+  color: var(--red);
+  background: rgba(216, 134, 127, 0.1);
+}
+
+.sync-log-time,
+.sync-log-entry small {
+  color: var(--dim);
+}
+
+.sync-log-entry strong {
+  color: var(--gold-soft);
+}
+
+.sync-log-entry p {
+  color: var(--muted);
+  font-size: 10px;
+  grid-column: 1 / -1;
+}
+
 .annual-flow-panel {
   margin-top: 17px;
 }
