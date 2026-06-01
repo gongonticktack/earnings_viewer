@@ -1,7 +1,21 @@
-const SOURCE_PAGE = "https://global.toyota/jp/ir/financial-results/";
+const companies = {
+  toyota: {
+    code: "toyota",
+    name: "TOYOTA MOTOR CORPORATION",
+    sourceName: "TOYOTA IR",
+    sourcePage: "https://global.toyota/jp/ir/financial-results/",
+  },
+  ntt: {
+    code: "ntt",
+    name: "NTT, INC.",
+    sourceName: "NTT IR",
+    sourcePage: "https://group.ntt/jp/ir/library/presentation/financial/",
+  },
+};
 
-// Toyota FY2026 values from official summary PDFs. Each entry is a standalone quarter.
-const fallbackResults = [
+// Official PDFs publish cumulative values. Each entry below is normalized to a standalone quarter.
+const fallbackResults = {
+  toyota: [
   {
     id: "fy2026-q1",
     fiscalYear: 2026,
@@ -50,11 +64,98 @@ const fallbackResults = [
     sourceUrl:
       "https://global.toyota/pages/global_toyota/ir/financial-results/2026_4q_summary_jp.pdf",
   },
-];
+  ],
+  ntt: [
+    {
+      id: "ntt-fy2025-q1",
+      fiscalYear: 2025,
+      quarter: 1,
+      periodEnd: "2025-06-30",
+      revenue: 3262039,
+      operatingCost: 2856846,
+      operatingIncome: 405193,
+      netIncome: 259714,
+      sourceUrl: "https://group.ntt/jp/newsrelease/2025/08/06/pdf/250806ab.pdf",
+    },
+    {
+      id: "ntt-fy2025-q2",
+      fiscalYear: 2025,
+      quarter: 2,
+      periodEnd: "2025-09-30",
+      revenue: 3510674,
+      operatingCost: 2970838,
+      operatingIncome: 539836,
+      netIncome: 335937,
+      sourceUrl: "https://group.ntt/jp/newsrelease/2025/11/04/pdf/251104ab.pdf",
+    },
+    {
+      id: "ntt-fy2025-q3",
+      fiscalYear: 2025,
+      quarter: 3,
+      periodEnd: "2025-12-31",
+      revenue: 3648325,
+      operatingCost: 3136209,
+      operatingIncome: 512116,
+      netIncome: 330409,
+      sourceUrl: "https://group.ntt/jp/newsrelease/2026/02/05/pdf/260205ab.pdf",
+    },
+    {
+      id: "ntt-fy2025-q4",
+      fiscalYear: 2025,
+      quarter: 4,
+      periodEnd: "2026-03-31",
+      revenue: 3988083,
+      operatingCost: 3739007,
+      operatingIncome: 249076,
+      netIncome: 110972,
+      sourceUrl: "https://group.ntt/jp/newsrelease/2026/05/08/pdf/260508ab.pdf",
+    },
+  ],
+};
+
+const annualAnalyses = {
+  toyota: {
+    previousFiscalYear: "FY2025",
+    currentFiscalYear: "FY2026",
+    previousOperatingIncome: 4795586,
+    currentOperatingIncome: 3766216,
+    previousRevenue: 48036704,
+    currentRevenue: 50684952,
+    previousOperatingCost: 43241118,
+    currentOperatingCost: 46918736,
+    investingCashFlow: -1520307,
+    expenses: [
+      { label: "売上原価", value: 39141418 },
+      { label: "金融事業に係る金融費用", value: 3079794 },
+      { label: "販売費及び一般管理費", value: 4697524 },
+    ],
+  },
+  ntt: {
+    previousFiscalYear: "FY2024",
+    currentFiscalYear: "FY2025",
+    previousOperatingIncome: 1649571,
+    currentOperatingIncome: 1706221,
+    previousRevenue: 13704727,
+    currentRevenue: 14409121,
+    previousOperatingCost: 12055156,
+    currentOperatingCost: 12702900,
+    investingCashFlow: -1023424,
+    expenses: [
+      { label: "人件費", value: 3214887 },
+      { label: "経費", value: 7207918 },
+      { label: "減価償却費", value: 1790983 },
+      { label: "固定資産除却費", value: 119782 },
+      { label: "減損損失", value: 80189 },
+      { label: "租税公課", value: 289141 },
+    ],
+  },
+};
 
 const state = {
-  results: fallbackResults,
-  activeId: fallbackResults.at(-1).id,
+  companyCode: "toyota",
+  resultsByCompany: { ...fallbackResults },
+  results: fallbackResults.toyota,
+  activeId: fallbackResults.toyota.at(-1).id,
 };
 
 const elements = {
@@ -66,6 +167,13 @@ const elements = {
   toast: document.querySelector("#toast"),
   marginValue: document.querySelector("#margin-value"),
   marginChange: document.querySelector("#margin-change"),
+  companyName: document.querySelector("#company-name"),
+  sourceName: document.querySelector("#source-name"),
+  irLink: document.querySelector("#ir-link"),
+  companyButtons: document.querySelectorAll(".company-button"),
+  flowPeriod: document.querySelector("#flow-period"),
+  investmentCashFlow: document.querySelector("#investment-cash-flow"),
+  expenseList: document.querySelector("#expense-list"),
 };
 
 const metricIds = ["revenue", "cost", "operating", "net"];
@@ -77,7 +185,8 @@ const metricKey = {
 };
 
 function formatBillions(value) {
-  return `¥${(value / 1000).toLocaleString("ja-JP", {
+  const sign = value < 0 ? "-" : "";
+  return `${sign}¥${(Math.abs(value) / 1000).toLocaleString("ja-JP", {
     minimumFractionDigits: 1,
     maximumFractionDigits: 1,
   })}B`;
@@ -304,15 +413,119 @@ function drawMarginChart() {
   });
 }
 
+function drawWaterfallChart() {
+  const canvas = document.querySelector("#waterfall-chart");
+  const { context: ctx, width, height } = prepareCanvas(canvas);
+  const analysis = annualAnalyses[state.companyCode];
+  const revenueChange = analysis.currentRevenue - analysis.previousRevenue;
+  const costChange = analysis.currentOperatingCost - analysis.previousOperatingCost;
+  const bars = [
+    { label: `${analysis.previousFiscalYear}\n営業利益`, value: analysis.previousOperatingIncome, total: true },
+    { label: "営業収益\n増減", value: revenueChange },
+    { label: "営業費用\n増減", value: -costChange },
+    { label: `${analysis.currentFiscalYear}\n営業利益`, value: analysis.currentOperatingIncome, total: true },
+  ];
+  const padding = { top: 36, right: 12, bottom: 47, left: 12 };
+  const chartWidth = width - padding.left - padding.right;
+  const chartHeight = height - padding.top - padding.bottom;
+  const gap = chartWidth / bars.length;
+  const barWidth = Math.min(76, gap * 0.54);
+  const max = Math.max(
+    analysis.previousOperatingIncome,
+    analysis.currentOperatingIncome,
+    analysis.previousOperatingIncome + Math.max(revenueChange, 0),
+  ) * 1.13;
+  const scaleY = (value) => padding.top + chartHeight - (value / max) * chartHeight;
+  let running = analysis.previousOperatingIncome;
+
+  ctx.clearRect(0, 0, width, height);
+  ctx.strokeStyle = "rgba(224, 205, 165, .10)";
+  ctx.lineWidth = 1;
+  for (let index = 0; index < 4; index += 1) {
+    const y = padding.top + (chartHeight / 3) * index;
+    ctx.beginPath();
+    ctx.moveTo(padding.left, y);
+    ctx.lineTo(width - padding.right, y);
+    ctx.stroke();
+  }
+
+  bars.forEach((bar, index) => {
+    const x = padding.left + gap * index + gap / 2;
+    let start = 0;
+    let end = bar.value;
+    if (!bar.total) {
+      start = running;
+      end = running + bar.value;
+      running = end;
+    }
+    const top = scaleY(Math.max(start, end));
+    const bottom = scaleY(Math.min(start, end));
+    ctx.fillStyle = bar.total ? "rgba(214, 183, 122, .68)" : bar.value >= 0 ? "#82ba8e" : "#d8867f";
+    ctx.fillRect(x - barWidth / 2, top, barWidth, Math.max(3, bottom - top));
+
+    if (index < bars.length - 1) {
+      const connectorY = scaleY(bar.total ? bar.value : end);
+      ctx.beginPath();
+      ctx.moveTo(x + barWidth / 2, connectorY);
+      ctx.lineTo(x + gap - barWidth / 2, connectorY);
+      ctx.strokeStyle = "rgba(224, 205, 165, .28)";
+      ctx.setLineDash([3, 3]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+
+    const displayedValue = bar.total ? bar.value : bar.value;
+    ctx.fillStyle = bar.total ? "#d6b77a" : bar.value >= 0 ? "#82ba8e" : "#d8867f";
+    ctx.font = '700 10px "Manrope"';
+    ctx.textAlign = "center";
+    ctx.fillText(`${displayedValue >= 0 && !bar.total ? "+" : ""}${formatBillions(displayedValue)}`, x, top - 10);
+
+    ctx.fillStyle = "#9b998f";
+    ctx.font = '600 9px "Noto Sans JP"';
+    bar.label.split("\n").forEach((line, lineIndex) => {
+      ctx.fillText(line, x, height - 23 + lineIndex * 12);
+    });
+  });
+}
+
+function renderAnnualFlow() {
+  const analysis = annualAnalyses[state.companyCode];
+  elements.flowPeriod.textContent = `${analysis.previousFiscalYear} → ${analysis.currentFiscalYear}`;
+  elements.investmentCashFlow.textContent = formatBillions(analysis.investingCashFlow);
+  elements.expenseList.innerHTML = analysis.expenses
+    .map(
+      (expense) => `
+        <div class="expense-item">
+          <span>${expense.label}</span>
+          <strong>${formatBillions(expense.value)}</strong>
+        </div>
+      `,
+    )
+    .join("");
+}
+
 function renderCharts() {
   drawPerformanceChart();
   drawMarginChart();
+  drawWaterfallChart();
+}
+
+function renderCompany() {
+  const company = companies[state.companyCode];
+  elements.companyName.textContent = company.name;
+  elements.sourceName.textContent = company.sourceName;
+  elements.irLink.href = company.sourcePage;
+  elements.companyButtons.forEach((button) => {
+    button.classList.toggle("active", button.dataset.company === state.companyCode);
+  });
 }
 
 function render() {
+  renderCompany();
   renderPicker();
   renderMetrics();
   renderDocuments();
+  renderAnnualFlow();
   renderCharts();
 }
 
@@ -334,19 +547,23 @@ async function syncResults() {
       return;
     }
 
-    const response = await fetch(`${config.supabaseUrl}/functions/v1/sync-toyota-results`, {
+    const response = await fetch(`${config.supabaseUrl}/functions/v1/sync-earnings`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${config.supabaseAnonKey}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ sourcePage: SOURCE_PAGE }),
+      body: JSON.stringify({ companyCode: state.companyCode }),
     });
     if (!response.ok) throw new Error(`同期に失敗しました (${response.status})`);
 
     const payload = await response.json();
     if (Array.isArray(payload.results) && payload.results.length) {
       state.results = payload.results.map(normalizeResult);
+      state.resultsByCompany[state.companyCode] = state.results;
+      if (payload.annualFlow) {
+        annualAnalyses[state.companyCode] = normalizeAnnualFlow(payload.annualFlow);
+      }
       state.activeId = state.results.at(-1).id;
       render();
     }
@@ -366,6 +583,7 @@ async function syncResults() {
 function normalizeResult(item) {
   return {
     id: item.id,
+    companyCode: item.company_code ?? item.companyCode,
     fiscalYear: item.fiscal_year ?? item.fiscalYear,
     quarter: item.quarter,
     periodEnd: item.period_end ?? item.periodEnd,
@@ -377,10 +595,33 @@ function normalizeResult(item) {
   };
 }
 
+function normalizeAnnualFlow(item) {
+  return {
+    previousFiscalYear: item.previous_fiscal_year ?? item.previousFiscalYear,
+    currentFiscalYear: item.current_fiscal_year ?? item.currentFiscalYear,
+    previousRevenue: item.previous_revenue ?? item.previousRevenue,
+    currentRevenue: item.current_revenue ?? item.currentRevenue,
+    previousOperatingCost: item.previous_operating_cost ?? item.previousOperatingCost,
+    currentOperatingCost: item.current_operating_cost ?? item.currentOperatingCost,
+    previousOperatingIncome: item.previous_operating_income ?? item.previousOperatingIncome,
+    currentOperatingIncome: item.current_operating_income ?? item.currentOperatingIncome,
+    investingCashFlow: item.investing_cash_flow ?? item.investingCashFlow,
+    expenses: item.expense_breakdown ?? item.expenses,
+  };
+}
+
 elements.quarterSelect.addEventListener("change", (event) => {
   state.activeId = event.target.value;
   renderMetrics();
   renderDocuments();
+});
+elements.companyButtons.forEach((button) => {
+  button.addEventListener("click", () => {
+    state.companyCode = button.dataset.company;
+    state.results = state.resultsByCompany[state.companyCode];
+    state.activeId = state.results.at(-1).id;
+    render();
+  });
 });
 elements.syncButton.addEventListener("click", syncResults);
 window.addEventListener("resize", renderCharts);

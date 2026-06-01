@@ -5,9 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta
       name="description"
-      content="トヨタ自動車の四半期決算を収集・可視化するダッシュボード"
+      content="複数企業の四半期決算を収集・可視化するダッシュボード"
     />
-    <title>TOYOTA Earnings Atelier</title>
+    <title>Earnings Atelier</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -21,12 +21,24 @@
     <div class="app-shell">
       <aside class="sidebar">
         <a class="brand" href="#">
-          <span class="brand-mark">T</span>
+          <span class="brand-mark">E</span>
           <span>
-            <strong>TOYOTA</strong>
+            <strong>EARNINGS</strong>
             <small>EARNINGS ATELIER</small>
           </span>
         </a>
+
+        <section class="company-switcher" aria-label="表示企業">
+          <p class="sidebar-label">COMPANIES</p>
+          <button class="company-button active" data-company="toyota" type="button">
+            <span class="company-monogram">T</span>
+            <span><strong>TOYOTA</strong><small>7203</small></span>
+          </button>
+          <button class="company-button" data-company="ntt" type="button">
+            <span class="company-monogram">N</span>
+            <span><strong>NTT</strong><small>9432</small></span>
+          </button>
+        </section>
 
         <nav class="side-nav" aria-label="メインナビゲーション">
           <a class="nav-item active" href="#overview">
@@ -34,6 +46,9 @@
           </a>
           <a class="nav-item" href="#quarterly">
             <span class="nav-icon">◒</span> Quarterly
+          </a>
+          <a class="nav-item" href="#annual-flow">
+            <span class="nav-icon">↝</span> Annual Flow
           </a>
           <a class="nav-item" href="#documents">
             <span class="nav-icon">▤</span> Documents
@@ -45,7 +60,7 @@
             <span class="status-dot"></span>
             <div>
               <small>DATA SOURCE</small>
-              <strong>TOYOTA IR</strong>
+              <strong id="source-name">TOYOTA IR</strong>
             </div>
           </div>
           <p>Official financial results<br />collection workspace.</p>
@@ -69,7 +84,7 @@
 
         <section class="hero-panel" id="overview">
           <div>
-            <p class="eyebrow">TOYOTA MOTOR CORPORATION</p>
+            <p class="eyebrow" id="company-name">TOYOTA MOTOR CORPORATION</p>
             <h2>Financial Overview</h2>
             <p class="hero-description">
               公式IR資料から取得した四半期ごとの業績を、単独期間ベースで可視化します。
@@ -165,6 +180,35 @@
           </article>
         </section>
 
+        <section class="panel annual-flow-panel" id="annual-flow">
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">YEAR-ON-YEAR BRIDGE</p>
+              <h3>How Operating Profit Changed</h3>
+            </div>
+            <span class="flow-period" id="flow-period">—</span>
+          </div>
+          <p class="panel-description">
+            前年度の営業利益から、収益と営業費用の増減をたどって今年度の結果を表示します。
+          </p>
+          <div class="flow-layout">
+            <div class="waterfall-wrap">
+              <canvas id="waterfall-chart"></canvas>
+            </div>
+            <aside class="flow-summary">
+              <div class="investment-card">
+                <small>INVESTING CASH FLOW</small>
+                <strong id="investment-cash-flow">—</strong>
+                <span>投資活動によるキャッシュフロー</span>
+              </div>
+              <div class="expense-list" id="expense-list"></div>
+            </aside>
+          </div>
+          <p class="flow-note">
+            投資活動キャッシュフローは営業費用とは別に表示しています。営業利益への橋渡しは連結損益計算書の営業収益・営業費用を使用しています。
+          </p>
+        </section>
+
         <section class="panel documents-panel" id="documents">
           <div class="panel-heading">
             <div>
@@ -173,6 +217,7 @@
             </div>
             <a
               class="external-link"
+              id="ir-link"
               href="https://global.toyota/jp/ir/financial-results/"
               target="_blank"
               rel="noreferrer"
