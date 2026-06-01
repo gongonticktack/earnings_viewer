@@ -96,12 +96,20 @@ create table if not exists public.earn_annual_profit_flows (
   current_operating_cost bigint not null,
   previous_operating_income bigint not null,
   current_operating_income bigint not null,
+  operating_cash_flow bigint,
   investing_cash_flow bigint not null,
+  financing_cash_flow bigint,
+  cash_and_cash_equivalents bigint,
   expense_breakdown jsonb not null default '[]'::jsonb,
   source_url text not null,
   synced_at timestamptz not null default now(),
   unique (company_code, current_fiscal_year)
 );
+
+alter table public.earn_annual_profit_flows
+  add column if not exists operating_cash_flow bigint,
+  add column if not exists financing_cash_flow bigint,
+  add column if not exists cash_and_cash_equivalents bigint;
 
 alter table public.earn_annual_profit_flows enable row level security;
 

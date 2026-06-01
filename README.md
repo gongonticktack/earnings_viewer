@@ -47,9 +47,11 @@ python -m http.server 5173
 
 ## データの扱い
 
+- 現在の数値はランダムなサンプルではなく、公式IR資料をもとにJSへ登録したデータです。ただし、公式サイトからのリアルタイム自動取得ではありません。
 - 出典は [トヨタ自動車 決算資料](https://global.toyota/jp/ir/financial-results/)、[NTT 決算説明会資料](https://group.ntt/jp/ir/library/presentation/financial/)、[東芝 財務・業績](https://www.global.toshiba/jp/ir/corporate/finance.html)、[ソフトバンク 決算短信](https://www.softbank.jp/corp/ir/documents/financial_reports/) です。
 - 表示単位は百万円です。カードでは十億円へ変換しています。
 - 公式資料の累計値から前四半期累計を差し引き、四半期単独値を保存しています。
 - 営業コストは `営業収益 - 営業利益` の算出値です。
+- キャッシュフロー欄には、決算PDFの営業活動CF、投資活動CF、財務活動CF、現金及び現金同等物の期末残高を表示します。東芝の登録済みPDFで開示されていない項目は「開示なし」と表示します。
 
 現在はトヨタ FY2025〜FY2026、NTT FY2024〜FY2025、東芝 FY2024〜FY2025、ソフトバンク FY2024〜FY2025 の登録済み四半期データをブラウザからDBへ保存します。ブラウザから公式IRページを直接取得するとCORS制限を受けるため、新しい決算発表を完全自動で解析して追加する場合はサーバー側の処理が必要です。

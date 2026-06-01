@@ -249,6 +249,8 @@ const fallbackResults = {
   ],
 };
 
+const registeredDataDescription = "公式IR資料をもとにJSへ登録済みのデータ（リアルタイム自動取得ではありません）";
+
 const annualAnalyses = {
   toyota: {
     previousFiscalYear: "FY2025",
@@ -259,7 +261,10 @@ const annualAnalyses = {
     currentRevenue: 50684952,
     previousOperatingCost: 43241118,
     currentOperatingCost: 46918736,
+    operatingCashFlow: 5472920,
     investingCashFlow: -1520307,
+    financingCashFlow: -536659,
+    cashAndCashEquivalents: 12659622,
     expenses: [
       { label: "売上原価", value: 39141418 },
       { label: "金融事業に係る金融費用", value: 3079794 },
@@ -275,7 +280,10 @@ const annualAnalyses = {
     currentRevenue: 14409121,
     previousOperatingCost: 12055156,
     currentOperatingCost: 12702900,
+    operatingCashFlow: 1485190,
     investingCashFlow: -1023424,
+    financingCashFlow: 441332,
+    cashAndCashEquivalents: 1921882,
     expenses: [
       { label: "人件費", value: 3214887 },
       { label: "経費", value: 7207918 },
@@ -294,7 +302,10 @@ const annualAnalyses = {
     currentRevenue: 3709100,
     previousOperatingCost: 3315400,
     currentOperatingCost: 3408300,
+    operatingCashFlow: 328300,
     investingCashFlow: 736400,
+    financingCashFlow: null,
+    cashAndCashEquivalents: null,
     expenses: [{ label: "営業費用合計", value: 3408300 }],
   },
   softbank: {
@@ -306,7 +317,10 @@ const annualAnalyses = {
     currentRevenue: 7038680,
     previousOperatingCost: 5555333,
     currentOperatingCost: 5996104,
+    operatingCashFlow: 1393760,
     investingCashFlow: -1270806,
+    financingCashFlow: -136854,
+    cashAndCashEquivalents: 1438799,
     expenses: [{ label: "営業費用合計", value: 5996104 }],
   },
 };
@@ -334,8 +348,10 @@ const elements = {
   irLink: document.querySelector("#ir-link"),
   companyButtons: document.querySelectorAll(".company-button"),
   flowPeriod: document.querySelector("#flow-period"),
+  operatingCashFlow: document.querySelector("#operating-cash-flow"),
   investmentCashFlow: document.querySelector("#investment-cash-flow"),
-  expenseList: document.querySelector("#expense-list"),
+  financingCashFlow: document.querySelector("#financing-cash-flow"),
+  cashAndCashEquivalents: document.querySelector("#cash-and-cash-equivalents"),
   syncLogList: document.querySelector("#sync-log-list"),
   logClearButton: document.querySelector("#log-clear-button"),
 };
@@ -354,6 +370,10 @@ function formatBillions(value) {
     minimumFractionDigits: 1,
     maximumFractionDigits: 1,
   })}B`;
+}
+
+function formatOptionalBillions(value) {
+  return value === null ? "開示なし" : formatBillions(value);
 }
 
 function formatMillions(value) {
@@ -585,26 +605,25 @@ function drawWaterfallChart() {
   const canvas = document.querySelector("#waterfall-chart");
   const { context: ctx, width, height } = prepareCanvas(canvas);
   const analysis = annualAnalyses[state.companyCode];
-  const revenueChange = analysis.currentRevenue - analysis.previousRevenue;
-  const costChange = analysis.currentOperatingCost - analysis.previousOperatingCost;
   const bars = [
-    { label: `${analysis.previousFiscalYear}\n営業利益`, value: analysis.previousOperatingIncome, total: true },
-    { label: "営業収益\n増減", value: revenueChange },
-    { label: "営業費用\n増減", value: -costChange },
-    { label: `${analysis.currentFiscalYear}\n営業利益`, value: analysis.currentOperatingIncome, total: true },
+    { label: "営業活動\nCF", value: analysis.operatingCashFlow },
+    { label: "投資活動\nCF", value: analysis.investingCashFlow },
+    { label: "財務活動\nCF", value: analysis.financingCashFlow },
+    { label: "期末現金\n残高", value: analysis.cashAndCashEquivalents, total: true },
   ];
   const padding = { top: 36, right: 12, bottom: 47, left: 12 };
   const chartWidth = width - padding.left - padding.right;
   const chartHeight = height - padding.top - padding.bottom;
   const gap = chartWidth / bars.length;
   const barWidth = Math.min(76, gap * 0.54);
-  const max = Math.max(
-    analysis.previousOperatingIncome,
-    analysis.currentOperatingIncome,
-    analysis.previousOperatingIncome + Math.max(revenueChange, 0),
-  ) * 1.13;
-  const scaleY = (value) => padding.top + chartHeight - (value / max) * chartHeight;
-  let running = analysis.previousOperatingIncome;
+  const availableValues = bars.map((bar) => bar.value).filter((value) => value !== null);
+  const min = Math.min(0, ...availableValues);
+  const max = Math.max(0, ...availableValues);
+  const span = Math.max(max - min, 1);
+  const chartMin = min - span * 0.08;
+  const chartMax = max + span * 0.12;
+  const scaleY = (value) => padding.top + chartHeight - ((value - chartMin) / (chartMax - chartMin)) * chartHeight;
+  const zeroY = scaleY(0);
 
   ctx.clearRect(0, 0, width, height);
   ctx.strokeStyle = "rgba(224, 205, 165, .10)";
@@ -616,37 +635,28 @@ function drawWaterfallChart() {
     ctx.lineTo(width - padding.right, y);
     ctx.stroke();
   }
+  ctx.beginPath();
+  ctx.moveTo(padding.left, zeroY);
+  ctx.lineTo(width - padding.right, zeroY);
+  ctx.strokeStyle = "rgba(224, 205, 165, .28)";
+  ctx.stroke();
 
   bars.forEach((bar, index) => {
     const x = padding.left + gap * index + gap / 2;
-    let start = 0;
-    let end = bar.value;
-    if (!bar.total) {
-      start = running;
-      end = running + bar.value;
-      running = end;
-    }
-    const top = scaleY(Math.max(start, end));
-    const bottom = scaleY(Math.min(start, end));
-    ctx.fillStyle = bar.total ? "rgba(214, 183, 122, .68)" : bar.value >= 0 ? "#82ba8e" : "#d8867f";
-    ctx.fillRect(x - barWidth / 2, top, barWidth, Math.max(3, bottom - top));
-
-    if (index < bars.length - 1) {
-      const connectorY = scaleY(bar.total ? bar.value : end);
-      ctx.beginPath();
-      ctx.moveTo(x + barWidth / 2, connectorY);
-      ctx.lineTo(x + gap - barWidth / 2, connectorY);
-      ctx.strokeStyle = "rgba(224, 205, 165, .28)";
-      ctx.setLineDash([3, 3]);
-      ctx.stroke();
-      ctx.setLineDash([]);
+    if (bar.value !== null) {
+      const valueY = scaleY(bar.value);
+      const top = Math.min(valueY, zeroY);
+      const bottom = Math.max(valueY, zeroY);
+      ctx.fillStyle = bar.total ? "rgba(214, 183, 122, .68)" : bar.value >= 0 ? "#82ba8e" : "#d8867f";
+      ctx.fillRect(x - barWidth / 2, top, barWidth, Math.max(3, bottom - top));
     }
 
-    const displayedValue = bar.total ? bar.value : bar.value;
-    ctx.fillStyle = bar.total ? "#d6b77a" : bar.value >= 0 ? "#82ba8e" : "#d8867f";
+    ctx.fillStyle = bar.total ? "#d6b77a" : bar.value === null ? "#77756e" : bar.value >= 0 ? "#82ba8e" : "#d8867f";
     ctx.font = '700 10px "Manrope"';
     ctx.textAlign = "center";
-    ctx.fillText(`${displayedValue >= 0 && !bar.total ? "+" : ""}${formatBillions(displayedValue)}`, x, top - 10);
+    const valueLabel = bar.value === null ? "開示なし" : `${bar.value >= 0 && !bar.total ? "+" : ""}${formatBillions(bar.value)}`;
+    const labelY = bar.value === null ? zeroY - 10 : scaleY(bar.value) + (bar.value < 0 ? 16 : -10);
+    ctx.fillText(valueLabel, x, labelY);
 
     ctx.fillStyle = "#9b998f";
     ctx.font = '600 9px "Noto Sans JP"';
@@ -658,18 +668,11 @@ function drawWaterfallChart() {
 
 function renderAnnualFlow() {
   const analysis = annualAnalyses[state.companyCode];
-  elements.flowPeriod.textContent = `${analysis.previousFiscalYear} → ${analysis.currentFiscalYear}`;
-  elements.investmentCashFlow.textContent = formatBillions(analysis.investingCashFlow);
-  elements.expenseList.innerHTML = analysis.expenses
-    .map(
-      (expense) => `
-        <div class="expense-item">
-          <span>${expense.label}</span>
-          <strong>${formatBillions(expense.value)}</strong>
-        </div>
-      `,
-    )
-    .join("");
+  elements.flowPeriod.textContent = analysis.currentFiscalYear;
+  elements.operatingCashFlow.textContent = formatOptionalBillions(analysis.operatingCashFlow);
+  elements.investmentCashFlow.textContent = formatOptionalBillions(analysis.investingCashFlow);
+  elements.financingCashFlow.textContent = formatOptionalBillions(analysis.financingCashFlow);
+  elements.cashAndCashEquivalents.textContent = formatOptionalBillions(analysis.cashAndCashEquivalents);
 }
 
 function renderCharts() {
@@ -804,13 +807,19 @@ async function loadCachedCompanyData(companyCode, config) {
 
   state.lastSyncedAtByCompany[companyCode] = companiesData[0]?.last_synced_at ?? null;
   if (resultsData.length) state.resultsByCompany[companyCode] = resultsData.map(normalizeResult);
-  if (flowsData.length) annualAnalyses[companyCode] = normalizeAnnualFlow(flowsData[0]);
+  if (flowsData.length) annualAnalyses[companyCode] = normalizeAnnualFlow({
+    ...annualAnalyses[companyCode],
+    ...flowsData[0],
+  });
   addSyncLog(
     "success",
     "DB読込完了",
     `${resultsData.length}件の四半期データを読み込みました。`,
     companyCode,
   );
+  if (resultsData.length) {
+    addSyncLog("success", "データ種別", `DB保存済み: ${registeredDataDescription}`, companyCode);
+  }
   return state.lastSyncedAtByCompany[companyCode];
 }
 
@@ -848,14 +857,18 @@ function serializeAnnualFlow(companyCode, item) {
     current_operating_cost: item.currentOperatingCost,
     previous_operating_income: item.previousOperatingIncome,
     current_operating_income: item.currentOperatingIncome,
+    operating_cash_flow: item.operatingCashFlow,
     investing_cash_flow: item.investingCashFlow,
+    financing_cash_flow: item.financingCashFlow,
+    cash_and_cash_equivalents: item.cashAndCashEquivalents,
     expense_breakdown: item.expenses,
     source_url: fallbackResults[companyCode].at(-1).sourceUrl,
   };
 }
 
 async function invokeSync(companyCode, config) {
-  addSyncLog("success", "DB保存開始", "同梱済みの決算データをDBへ保存します。", companyCode);
+  addSyncLog("success", "データ種別", registeredDataDescription, companyCode);
+  addSyncLog("success", "DB保存開始", "JSへ登録済みの決算データをDBへ保存します。", companyCode);
   const baseUrl = `${config.supabaseUrl}/rest/v1`;
   const syncedAt = new Date().toISOString();
   const results = fallbackResults[companyCode].map((item) => serializeResult(companyCode, item));
@@ -891,8 +904,8 @@ async function refreshCompany({ force = false, notify = false } = {}) {
 
   try {
     if (!config.supabaseUrl || !config.supabaseAnonKey) {
-      addSyncLog("success", "デモモード", "Supabase未接続のため、同梱サンプルを表示しました。", companyCode);
-      if (notify) showToast("デモモード: 保存済みのサンプルを表示しています。");
+      addSyncLog("success", "デモモード", `Supabase未接続: ${registeredDataDescription}`, companyCode);
+      if (notify) showToast("デモモード: JSへ登録済みの決算データを表示しています。");
       return;
     }
 
@@ -947,7 +960,10 @@ function normalizeAnnualFlow(item) {
     currentOperatingCost: item.current_operating_cost ?? item.currentOperatingCost,
     previousOperatingIncome: item.previous_operating_income ?? item.previousOperatingIncome,
     currentOperatingIncome: item.current_operating_income ?? item.currentOperatingIncome,
+    operatingCashFlow: item.operating_cash_flow ?? item.operatingCashFlow,
     investingCashFlow: item.investing_cash_flow ?? item.investingCashFlow,
+    financingCashFlow: item.financing_cash_flow ?? item.financingCashFlow ?? null,
+    cashAndCashEquivalents: item.cash_and_cash_equivalents ?? item.cashAndCashEquivalents ?? null,
     expenses: item.expense_breakdown ?? item.expenses,
   };
 }

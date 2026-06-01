@@ -192,13 +192,13 @@
         <section class="panel annual-flow-panel" id="annual-flow">
           <div class="panel-heading">
             <div>
-              <p class="eyebrow">YEAR-ON-YEAR BRIDGE</p>
-              <h3>How Operating Profit Changed</h3>
+              <p class="eyebrow">CASH FLOW BREAKDOWN</p>
+              <h3>How Cash Moved</h3>
             </div>
             <span class="flow-period" id="flow-period">—</span>
           </div>
           <p class="panel-description">
-            前年度の営業利益から、収益と営業費用の増減をたどって今年度の結果を表示します。
+            決算PDFに記載された営業活動・投資活動・財務活動のキャッシュフローと期末現金残高を表示します。
           </p>
           <div class="flow-layout">
             <div class="waterfall-wrap">
@@ -206,15 +206,29 @@
             </div>
             <aside class="flow-summary">
               <div class="investment-card">
+                <small>OPERATING CASH FLOW</small>
+                <strong id="operating-cash-flow">—</strong>
+                <span>営業活動によるキャッシュフロー</span>
+              </div>
+              <div class="investment-card">
                 <small>INVESTING CASH FLOW</small>
                 <strong id="investment-cash-flow">—</strong>
                 <span>投資活動によるキャッシュフロー</span>
               </div>
-              <div class="expense-list" id="expense-list"></div>
+              <div class="investment-card">
+                <small>FINANCING CASH FLOW</small>
+                <strong id="financing-cash-flow">—</strong>
+                <span>財務活動によるキャッシュフロー</span>
+              </div>
+              <div class="investment-card">
+                <small>CASH AT END OF YEAR</small>
+                <strong id="cash-and-cash-equivalents">—</strong>
+                <span>現金及び現金同等物の期末残高</span>
+              </div>
             </aside>
           </div>
           <p class="flow-note">
-            投資活動キャッシュフローは営業費用とは別に表示しています。営業利益への橋渡しは連結損益計算書の営業収益・営業費用を使用しています。
+            決算PDFに掲載されていない項目は「開示なし」と表示します。東芝の登録済みPDFでは財務活動CFと期末現金残高が開示されていません。
           </p>
         </section>
 
