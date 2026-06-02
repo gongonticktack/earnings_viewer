@@ -313,6 +313,7 @@ const annualAnalyses = {
 const state = {
   companyCode: "toyota",
   resultsByCompany: { ...fallbackResults },
+  irDocumentsByCompany: {},
   results: fallbackResults.toyota,
   activeId: fallbackResults.toyota.at(-1).id,
   lastSyncedAtByCompany: {},
@@ -467,7 +468,26 @@ function renderMetrics() {
 
 function renderDocuments() {
   if (!state.results.length) {
-    elements.documentsBody.innerHTML = '<tr><td colspan="6">決算データは未登録です。公式IR取込処理の追加が必要です。</td></tr>';
+    const documents = state.irDocumentsByCompany[state.companyCode];
+    if (!documents) {
+      elements.documentsBody.innerHTML = '<tr><td colspan="6">公式IR資料を読み込んでいます。</td></tr>';
+      return;
+    }
+    if (!documents.length) {
+      elements.documentsBody.innerHTML = '<tr><td colspan="6">公式IR資料を取得できませんでした。</td></tr>';
+      return;
+    }
+    elements.documentsBody.innerHTML = documents
+      .map(
+        (document) => `
+          <tr>
+            <td>公式IR</td>
+            <td colspan="4">${escapeHtml(document.title)}</td>
+            <td><a class="pdf-link" href="${escapeHtml(document.url)}" target="_blank" rel="noreferrer">${escapeHtml(document.type)} ↗</a></td>
+          </tr>
+        `,
+      )
+      .join("");
     return;
   }
   elements.documentsBody.innerHTML = [...state.results]
@@ -933,11 +953,11 @@ function hasRegisteredSourceData(companyCode) {
 
 function updateSyncButtonAvailability({ loading = false } = {}) {
   const isSupported = hasRegisteredSourceData(state.companyCode);
-  elements.syncButton.disabled = loading || !isSupported;
+  elements.syncButton.disabled = loading;
   elements.syncButton.title = isSupported
     ? "JSへ登録済みの公式IRデータをDBへ再保存します。"
-    : "公式IRデータの取込処理は未登録です。";
-  elements.syncButtonLabel.textContent = isSupported ? "今すぐ再取得" : "IR取込未対応";
+    : "公式IRサイトから最新の資料一覧を取得します。";
+  elements.syncButtonLabel.textContent = isSupported ? "今すぐ再取得" : "IR資料を取得";
 }
 
 function addSyncLog(level, stage, message, companyCode = state.companyCode) {
@@ -1085,6 +1105,25 @@ async function loadCachedCompanyData(companyCode, config) {
   return state.lastSyncedAtByCompany[companyCode];
 }
 
+async function loadOfficialIrDocuments(companyCode) {
+  addSyncLog("info", "公式IR資料取得 開始", "公式IRサイトへ最新資料を問い合わせています。", companyCode);
+  try {
+    const payload = await fetchJson(`/api/ir/${companyCode}`);
+    state.irDocumentsByCompany[companyCode] = payload.documents ?? [];
+    addSyncLog(
+      "success",
+      "公式IR資料取得 完了",
+      `${state.irDocumentsByCompany[companyCode].length}件の公式IR資料を読み込みました。`,
+      companyCode,
+    );
+    return { documents: state.irDocumentsByCompany[companyCode].length, officialIr: true };
+  } catch (error) {
+    state.irDocumentsByCompany[companyCode] = [];
+    addSyncLog("error", "公式IR資料取得 失敗", error.message, companyCode);
+    return { documents: 0, officialIr: true, irDiscoveryFailed: true };
+  }
+}
+
 function restWriteHeaders(config, { returnRepresentation = false } = {}) {
   return {
     ...apiHeaders(config),
@@ -1194,6 +1233,18 @@ async function refreshCompany({ force = false, notify = false } = {}) {
 
   try {
     if (!config.supabaseUrl || !config.supabaseAnonKey) {
+      if (!hasRegisteredSourceData(companyCode)) {
+        const payload = await loadOfficialIrDocuments(companyCode);
+        if (state.companyCode === companyCode) render();
+        if (notify) {
+          showToast(
+            payload.irDiscoveryFailed
+              ? "公式IR資料を取得できませんでした。"
+              : `${payload.documents}件の公式IR資料を取得しました。`,
+          );
+        }
+        return;
+      }
       addSyncLog("success", "デモモード", `Supabase未接続: ${registeredDataDescription}`, companyCode);
       if (notify) showToast("デモモード: JSへ登録済みの決算データを表示しています。");
       return;
@@ -1201,7 +1252,9 @@ async function refreshCompany({ force = false, notify = false } = {}) {
 
     const lastSyncedAt = await loadCachedCompanyData(companyCode, config);
     let payload = null;
-    if (force || isOlderThanThreeMonths(lastSyncedAt)) {
+    if (!hasRegisteredSourceData(companyCode)) {
+      payload = await loadOfficialIrDocuments(companyCode);
+    } else if (force || isOlderThanThreeMonths(lastSyncedAt)) {
       payload = await invokeSync(companyCode, config);
     } else {
       addSyncLog("success", "鮮度確認", "前回取得から3か月未満のため、DBのデータを使用します。", companyCode);
@@ -1216,7 +1269,11 @@ async function refreshCompany({ force = false, notify = false } = {}) {
     if (notify || payload) {
       showToast(
         payload
-          ? payload.unsupported
+          ? payload.officialIr
+            ? payload.irDiscoveryFailed
+              ? "公式IR資料を取得できませんでした。"
+              : `${payload.documents}件の公式IR資料を取得しました。`
+            : payload.unsupported
             ? "この会社は企業マスタと株価のみ登録済みです。"
             : payload.synced
             ? `${payload.synced}件の決算データを再取得しました。`
