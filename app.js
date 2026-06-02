@@ -478,25 +478,43 @@ function renderMetrics() {
 function renderDocuments() {
   const documents = state.edinetDocumentsByCompany[state.companyCode];
   if (!documents) {
-    elements.documentsBody.innerHTML = '<tr><td colspan="6">EDINET書類を読み込んでいます。</td></tr>';
+    elements.documentsBody.innerHTML = '<tr><td colspan="4">EDINET書類を読み込んでいます。</td></tr>';
     return;
   }
   if (!documents.length) {
-    elements.documentsBody.innerHTML = '<tr><td colspan="6">保存済みのEDINET書類はありません。</td></tr>';
+    elements.documentsBody.innerHTML = '<tr><td colspan="4">保存済みのEDINET書類はありません。</td></tr>';
     return;
   }
   elements.documentsBody.innerHTML = documents
     .map(
       (document) => `
         <tr>
-          <td>${formatDate(document.submittedAt)}</td>
+          <td>${edinetFiscalYear(document)}</td>
+          <td>${edinetQuarter(document)}</td>
           <td>${escapeHtml(document.description)}</td>
-          <td colspan="3">${document.periodEnd ? `${formatDate(document.periodStart)} - ${formatDate(document.periodEnd)}` : "—"}</td>
           <td><a class="pdf-link" href="${escapeHtml(document.pdfUrl)}" target="_blank" rel="noreferrer">PDF ↗</a></td>
         </tr>
       `,
     )
     .join("");
+}
+
+function edinetFiscalYear(document) {
+  return document.periodEnd ? `FY${new Date(document.periodEnd).getUTCFullYear()}` : "—";
+}
+
+function edinetQuarter(document) {
+  if (["120", "130"].includes(document.docTypeCode)) return "Full Year";
+  if (["160", "170"].includes(document.docTypeCode)) return "Q2";
+  if (!document.periodStart || !document.periodEnd) return "—";
+
+  const start = new Date(document.periodStart);
+  const end = new Date(document.periodEnd);
+  const months = (end.getUTCFullYear() - start.getUTCFullYear()) * 12
+    + end.getUTCMonth()
+    - start.getUTCMonth()
+    + 1;
+  return months >= 1 && months <= 12 ? `Q${Math.ceil(months / 3)}` : "—";
 }
 
 function prepareCanvas(canvas) {
@@ -1162,6 +1180,7 @@ function normalizeEdinetDocument(item) {
     companyCode: item.company_code ?? item.companyCode,
     edinetCode: item.edinet_code ?? item.edinetCode,
     filerName: item.filer_name ?? item.filerName,
+    docTypeCode: item.doc_type_code ?? item.docTypeCode,
     description: item.description,
     periodStart: item.period_start ?? item.periodStart,
     periodEnd: item.period_end ?? item.periodEnd,
