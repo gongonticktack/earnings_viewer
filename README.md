@@ -8,14 +8,13 @@
 
 - トヨタ自動車
 - NTT
-- ソフトバンク
 - ソフトバンクグループ
 - 三菱UFJフィナンシャル・グループ
 - ファーストリテイリング
 - 日立製作所
 - 三井住友フィナンシャルグループ
 
-トヨタ自動車、NTT、ソフトバンクは直近2年度分の四半期データを表示します。全8社について、公式IRサイトから最新資料のリンクを取得し、決算PDFの解析候補をDBへ保存できます。
+トヨタ自動車、NTT、ソフトバンクグループは直近2年度分の四半期データを表示します。公式IRサイトから最新の四半期決算報告書だけを取得し、決算PDFの解析候補をDBへ保存できます。
 
 ## ローカル表示
 
@@ -56,7 +55,7 @@ python -m http.server 5173
 ## データの扱い
 
 - 現在の数値はランダムなサンプルではなく、公式IR資料をもとにJSへ登録したデータです。ただし、公式サイトからのリアルタイム自動取得ではありません。
-- 出典は [トヨタ自動車 決算資料](https://global.toyota/jp/ir/financial-results/)、[NTT 決算説明会資料](https://group.ntt/jp/ir/library/presentation/financial/)、[ソフトバンク 決算短信](https://www.softbank.jp/corp/ir/documents/financial_reports/) です。
+- 出典は [トヨタ自動車 決算資料](https://global.toyota/jp/ir/financial-results/)、[NTT 決算説明会資料](https://group.ntt/jp/ir/library/presentation/financial/)、[ソフトバンクグループ 決算資料](https://group.softbank/ir/financials/financial_reports) です。
 - DBへ保存する単位は百万円です。画面では兆・億円へ変換しています。
 - 公式資料の累計値から前四半期累計を差し引き、四半期単独値を保存しています。
 - 営業コストは `営業収益 - 営業利益` の算出値です。
@@ -65,4 +64,4 @@ python -m http.server 5173
 - 全8社について、Cloudflare Worker 経由で公式IRサイトから最新資料のリンクを取得します。Workers AI の `toMarkdown()` で決算PDF本文を抽出し、AIで構造化した候補値を根拠文・信頼度とともに `earn_ir_document_extractions` へ保存します。
 - PDF解析結果は `reviewed = false` で保存します。四半期累計から単独四半期への変換と企業別の項目確認が済んだ値だけを画面用テーブルへ反映してください。MUFG と三井住友FGは銀行業のため、銀行向け指標の追加が必要です。
 
-現在はトヨタ FY2025〜FY2026、NTT FY2024〜FY2025、ソフトバンク FY2024〜FY2025 の登録済み四半期データをブラウザからDBへ保存します。ブラウザから公式IRページを直接取得するとCORS制限を受けるため、新しい決算発表を完全自動で解析して追加する場合はサーバー側の処理が必要です。
+現在はトヨタ FY2025〜FY2026、NTT FY2024〜FY2025、ソフトバンクグループは最新年度の四半期決算短信を対象とする予定です。ブラウザから公式IRページを直接取得するとCORS制限を受けるため、新しい決算発表を完全自動で解析して追加する場合はサーバー側の処理が必要です。

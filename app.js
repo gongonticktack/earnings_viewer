@@ -15,13 +15,6 @@ const companies = {
     sourcePage: "https://group.ntt/jp/ir/library/presentation/financial/",
     stockSymbol: "9432.T",
   },
-  softbank: {
-    code: "softbank",
-    name: "SOFTBANK CORP.",
-    sourceName: "SOFTBANK IR",
-    sourcePage: "https://www.softbank.jp/corp/ir/documents/financial_reports/",
-    stockSymbol: "9434.T",
-  },
   "softbank-group": {
     code: "softbank-group",
     name: "SOFTBANK GROUP CORP.",
@@ -403,11 +396,11 @@ function formatDate(dateString) {
 }
 
 function quarterLabel(result) {
-  return `FY${result.fiscalYear} Q${result.quarter}`;
+  return `${result.fiscalYear}年${result.quarter}Q`;
 }
 
 function chartQuarterLabel(result) {
-  return `FY${String(result.fiscalYear).slice(-2)} Q${result.quarter}`;
+  return `${String(result.fiscalYear)}年${result.quarter}Q`;
 }
 
 function activeResult() {
@@ -456,7 +449,7 @@ function renderMetrics() {
     return;
   }
   const previous = previousResult(current);
-  elements.periodCaption.textContent = `決算期間終了日 ${formatDate(current.periodEnd)}`;
+  elements.periodCaption.textContent = `発行年月日 ${formatDate(current.periodEnd)}`;
 
   metricIds.forEach((metric) => {
     const key = metric === "operating" && usesPretaxIncome ? "pretaxIncome" : metricKey[metric];
@@ -1123,12 +1116,19 @@ async function loadCachedCompanyData(companyCode, config) {
   return state.lastSyncedAtByCompany[companyCode];
 }
 
+function isQuarterlyReportTitle(text) {
+  return /決算短信|決算報告|四半期報告|四半期決算|quarterly report|quarterly results|earnings results|financial results|financial report/i.test(
+    text,
+  );
+}
+
 function selectFinancialDocument(documents) {
-  return documents.find(
+  const candidates = documents.filter(
     (document) =>
       document.type === "PDF"
-      && /決算短信|決算報告|financial report|quarterly results|earnings results|financial results/i.test(document.title),
-  ) ?? documents.find((document) => document.type === "PDF");
+      && (isQuarterlyReportTitle(document.title) || isQuarterlyReportTitle(document.url)),
+  );
+  return candidates[0] ?? documents.find((document) => document.type === "PDF");
 }
 
 async function saveIrDocumentExtraction(companyCode, payload, config) {

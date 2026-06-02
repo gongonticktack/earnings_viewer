@@ -50,6 +50,21 @@ function decodeHtml(value) {
     .replaceAll("&nbsp;", " ");
 }
 
+function isQuarterlyReportTitle(text) {
+  return /決算短信|決算報告|四半期報告|四半期決算|quarterly report|quarterly results|earnings results|financial results|financial report/i.test(
+    text,
+  );
+}
+
+function filterQuarterlyDocuments(documents) {
+  const filtered = documents.filter(
+    (document) =>
+      document.type === "PDF"
+      && (isQuarterlyReportTitle(document.title) || isQuarterlyReportTitle(document.url)),
+  );
+  return filtered.length ? filtered : documents;
+}
+
 function textContent(value) {
   return decodeHtml(value.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim());
 }
@@ -141,11 +156,12 @@ async function fetchOfficialIrDocuments(companyCode) {
     documents.push(...discoverLooseIrDocuments(await supplemental.text(), source));
   }
   const uniqueDocuments = [...new Map(documents.map((document) => [document.url, document])).values()].slice(0, 30);
+  const documentsToReturn = filterQuarterlyDocuments(uniqueDocuments);
   return Response.json(
     {
       companyCode,
       sourcePage: source.sourcePage,
-      documents: uniqueDocuments,
+      documents: documentsToReturn,
     },
     { headers: { "Cache-Control": "public, max-age=3600" } },
   );
