@@ -176,5 +176,22 @@ create policy "Earn EDINET documents are public"
   to anon, authenticated
   using (true);
 
+drop policy if exists "Earn EDINET documents can be inserted" on public.earn_edinet_documents;
+create policy "Earn EDINET documents can be inserted"
+  on public.earn_edinet_documents
+  for insert
+  to anon, authenticated
+  with check (true);
+
+drop policy if exists "Earn EDINET documents can be updated" on public.earn_edinet_documents;
+create policy "Earn EDINET documents can be updated"
+  on public.earn_edinet_documents
+  for update
+  to anon, authenticated
+  using (true)
+  with check (true);
+
+grant insert, update on public.earn_edinet_documents to anon, authenticated;
+
 create index if not exists earn_edinet_documents_company_submitted_idx
   on public.earn_edinet_documents (company_code, submitted_at desc);

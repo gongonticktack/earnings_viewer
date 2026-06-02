@@ -952,8 +952,8 @@ function showToast(message) {
 
 function updateSyncButtonAvailability({ loading = false } = {}) {
   elements.syncButton.disabled = loading;
-  elements.syncButton.title = "本日提出されたEDINET書類を取得してDBへ保存します。";
-  elements.syncButtonLabel.textContent = "EDINETを同期";
+  elements.syncButton.title = "公式IR PDF一覧を更新し、本日提出されたEDINET書類をDBへ保存します。";
+  elements.syncButtonLabel.textContent = "更新";
 }
 
 function addSyncLog(level, stage, message, companyCode = state.companyCode) {
@@ -1123,10 +1123,32 @@ async function loadOfficialIrDocuments(companyCode) {
 
 async function syncTodayEdinetDocuments(companyCode, config) {
   addSyncLog("info", "EDINET同期 開始", "本日提出された対象企業の書類をDBへ保存します。", companyCode);
-  const payload = await fetchJson("/api/edinet/sync", { method: "POST" });
-  addSyncLog("success", "EDINET同期 完了", `${payload.saved}件の書類をDBへ保存しました。`, companyCode);
-  await loadCachedCompanyData(companyCode, config);
-  return payload;
+  try {
+    const payload = await fetchJson("/api/edinet/sync", { method: "POST" });
+    if (!payload.persisted && payload.documents?.length) {
+      addSyncLog("info", "EDINET保存 開始", "ブラウザのSupabase接続で保存します。", companyCode);
+      await fetchJson(`${config.supabaseUrl}/rest/v1/earn_edinet_documents?on_conflict=id`, {
+        method: "POST",
+        headers: {
+          ...apiHeaders(config),
+          Prefer: "resolution=merge-duplicates,return=minimal",
+        },
+        body: JSON.stringify(payload.documents),
+      });
+      payload.saved = payload.documents.length;
+      payload.persisted = true;
+      addSyncLog("success", "EDINET保存 完了", `${payload.saved}件の書類をDBへ保存しました。`, companyCode);
+    }
+    if (payload.persistenceError) {
+      addSyncLog("error", "Worker保存 失敗", payload.persistenceError, companyCode);
+    }
+    addSyncLog("success", "EDINET同期 完了", `${payload.saved}件の書類をDBへ保存しました。`, companyCode);
+    await loadCachedCompanyData(companyCode, config);
+    return payload;
+  } catch (error) {
+    addSyncLog("error", "EDINET同期 失敗", error.message, companyCode);
+    return { saved: 0, edinetSyncFailed: true };
+  }
 }
 
 async function refreshCompany({ force = false, notify = false } = {}) {
@@ -1156,7 +1178,13 @@ async function refreshCompany({ force = false, notify = false } = {}) {
       render();
     }
     if (notify || payload) {
-      showToast(payload ? `${payload.saved}件のEDINET書類を保存しました。` : "保存済みの最新データを表示しています。");
+      showToast(
+        payload?.edinetSyncFailed
+          ? "公式IR PDF一覧を更新しました。EDINET同期の詳細はSync Logを確認してください。"
+          : payload
+          ? `${payload.saved}件のEDINET書類を保存しました。`
+          : "保存済みの最新データを表示しています。",
+      );
     }
   } catch (error) {
     addSyncLog("error", "同期失敗", error.message, companyCode);

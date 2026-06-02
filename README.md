@@ -40,11 +40,11 @@ python -m http.server 5173
 
 テーブル名は他アプリとの同居を考慮して `earn_` 接頭辞で統一しています。以前の接頭辞なしテーブルは `schema.sql` 実行時に削除されません。
 
-ブラウザから Supabase REST API を呼び出して表示用データを読み込みます。EDINET書類の追加・更新は Cloudflare Worker から service role key を使って行います。
+ブラウザから Supabase REST API を呼び出して表示用データを読み込みます。手動更新時のEDINET書類は、Worker側のservice role keyが未設定の場合にブラウザのSupabase接続で保存します。
 
 ## Cloudflare Worker 設定
 
-EDINET API キーと Supabase の接続情報を Worker Secret に登録します。
+EDINET API キーを Worker Secret に登録します。日次CronでEDINET書類をDBへ保存する場合は、Supabase の接続情報も登録します。
 
 ```powershell
 npx wrangler secret put EDINET_API_KEY
@@ -58,7 +58,7 @@ EDINET API キーは [EDINET API利用登録](https://api.edinet-fsa.go.jp/api/a
 
 Cloudflare Cron Trigger が毎日 00:15 JST に当日分のEDINET書類一覧を取得します。対象企業の有価証券報告書、半期報告書、旧四半期報告書と各訂正報告書を `earn_edinet_documents` へ保存します。
 
-画面の `EDINETを同期` を押すと、当日分を手動で再取得します。過去日を取り込む場合は、配信済みWorkerに対して日付を指定します。
+画面の `更新` を押すと、公式IR PDF一覧と当日分のEDINET提出情報を再取得します。過去日を取り込む場合は、配信済みWorkerに対して日付を指定します。
 
 ```powershell
 curl.exe -X POST "https://<worker-domain>/api/edinet/sync?date=2026-06-01"

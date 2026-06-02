@@ -44,7 +44,8 @@ const irSources = {
 };
 
 function jsonError(error, status = 500) {
-  return Response.json({ error }, { status });
+  const message = error instanceof Error ? error.message : String(error ?? "Unknown error");
+  return Response.json({ error: message }, { status });
 }
 
 function jstDate() {
@@ -121,9 +122,9 @@ function filterEdinetDocuments(documents, requestedCompanyCode = null) {
 }
 
 async function saveEdinetDocuments(env, documents) {
-  if (!documents.length) return;
+  if (!documents.length) return true;
   if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY) {
-    throw new Error("SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY is not configured");
+    return false;
   }
   const response = await fetch(`${env.SUPABASE_URL}/rest/v1/earn_edinet_documents?on_conflict=id`, {
     method: "POST",
@@ -135,7 +136,11 @@ async function saveEdinetDocuments(env, documents) {
     },
     body: JSON.stringify(documents),
   });
-  if (!response.ok) throw new Error(`Supabase EDINET document save failed (${response.status})`);
+  if (!response.ok) {
+    const detail = await response.text();
+    throw new Error(`Supabase EDINET document save failed (${response.status}): ${detail.slice(0, 500)}`);
+  }
+  return true;
 }
 
 async function syncEdinetDocuments(request, env) {
@@ -147,8 +152,14 @@ async function syncEdinetDocuments(request, env) {
   if (!isDate(date)) return jsonError("date must be YYYY-MM-DD", 400);
 
   const documents = filterEdinetDocuments(await fetchEdinetDocumentList(env, date));
-  await saveEdinetDocuments(env, documents);
-  return Response.json({ date, saved: documents.length, documents });
+  let persisted = false;
+  let persistenceError = null;
+  try {
+    persisted = await saveEdinetDocuments(env, documents);
+  } catch (error) {
+    persistenceError = error instanceof Error ? error.message : String(error);
+  }
+  return Response.json({ date, saved: persisted ? documents.length : 0, persisted, persistenceError, documents });
 }
 
 async function fetchCompanyEdinetDocuments(request, env, companyCode) {
@@ -271,6 +282,7 @@ export default {
   async scheduled(_controller, env) {
     const date = jstDate();
     const documents = filterEdinetDocuments(await fetchEdinetDocumentList(env, date));
-    await saveEdinetDocuments(env, documents);
+    const persisted = await saveEdinetDocuments(env, documents);
+    if (!persisted) throw new Error("SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY is not configured");
   },
 };
