@@ -502,6 +502,15 @@ function renderDocuments() {
 
 function officialDocumentFiscalYear(document) {
   const value = `${document.title} ${document.url}`;
+  const mufgMatch = value.match(/summary(\d{2})(?:03|06|09|12)_ja\.pdf/i);
+  if (mufgMatch) return `FY20${mufgMatch[1]}`;
+
+  const hitachiMatch = value.match(/\/(\d{4})_(?:[1-3]Q|An)\.pdf/i);
+  if (hitachiMatch) return `FY${Number(hitachiMatch[1]) + 1}`;
+
+  const fastRetailingMatch = value.match(/tanshin(\d{4})\d{2}_[1-4]q\.pdf/i);
+  if (fastRetailingMatch) return `FY${fastRetailingMatch[1]}`;
+
   const match = value.match(/\bfy\s*([12]\d{3}|[0-9]{2})\b/i)
     ?? value.match(/(?:^|[^\d])([12]\d{3})(?:[^\d]|$)/);
   if (!match) return "—";
@@ -511,6 +520,11 @@ function officialDocumentFiscalYear(document) {
 
 function officialDocumentQuarter(document) {
   const value = `${document.title} ${document.url}`;
+  const mufgMatch = value.match(/summary\d{2}(03|06|09|12)_ja\.pdf/i);
+  if (mufgMatch) return { "03": "Q4", "06": "Q1", "09": "Q2", "12": "Q3" }[mufgMatch[1]];
+
+  if (/_An\.pdf/i.test(value) || /_fy_01\.pdf/i.test(value)) return "Q4";
+
   const match = value.match(/q([1-4])/i)
     ?? value.match(/([1-4])q/i)
     ?? value.match(/第\s*([1-4])\s*四半期/);

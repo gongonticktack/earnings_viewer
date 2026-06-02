@@ -17,36 +17,43 @@ const irSources = {
     sourcePage: "https://global.toyota/jp/ir/financial-results/",
     allowedDomains: ["global.toyota"],
     includePatterns: [/決算要旨|financial results|financial summary|summary of consolidated financial results/i],
+    urlPatterns: [/\/ir\/financial-results\/\d{4}_[1-4]q_summary_jp\.pdf$/i],
   },
   ntt: {
     sourcePage: "https://group.ntt/jp/ir/library/results/",
     allowedDomains: ["group.ntt", "ntt.jp"],
     includePatterns: [/決算短信|financial results|earnings release|summary of consolidated financial results/i],
+    urlPatterns: [/\/ir\/library\/results\/\d{4}\/pdf\/fy\d{4}q[1-4]kessan\d+\.pdf$/i],
   },
   "softbank-group": {
     sourcePage: "https://group.softbank/ir/financials/financial_reports",
     allowedDomains: ["group.softbank"],
     includePatterns: [/決算短信|financial report|financial results|earnings results/i],
+    urlPatterns: [/\/financial_reports\/financial-report_q[1-4]fy\d{4}_\d+_ja\.pdf$/i],
   },
   mufg: {
     sourcePage: "https://www.mufg.jp/ir/fs/index.html?link_id=ir_contents_fs",
     allowedDomains: ["mufg.jp"],
     includePatterns: [/決算短信/i],
+    urlPatterns: [/\/dam\/ir\/fs\/\d{4}\/pdf\/summary\d{4}_ja\.pdf$/i],
   },
   "fast-retailing": {
     sourcePage: "https://www.fastretailing.com/jp/ir/library/tanshin.html",
     allowedDomains: ["fastretailing.com"],
     includePatterns: [/決算短信|financial results|summary of consolidated financial results/i],
+    urlPatterns: [/\/jp\/ir\/library\/pdf\/tanshin\d{6}_[1-4]q\.pdf$/i],
   },
   hitachi: {
     sourcePage: "https://www.hitachi.com/ja-jp/ir/library/fr/",
-    allowedDomains: ["hitachi.com"],
+    allowedDomains: ["hitachi.com", "hitachi.co.jp"],
     includePatterns: [/決算短信|financial results|earnings release|summary of consolidated financial results/i],
+    urlPatterns: [/\/(?:content\/dam\/hitachi\/global\/ja_jp\/press\/files|New\/cnews\/month)\/\d{4}\/\d{2}\/\d{4}\/\d{4}_(?:[1-3]Q|An)\.pdf$/i],
   },
   smfg: {
     sourcePage: "https://www.smfg.co.jp/investor/financial/latest_statement.html",
     allowedDomains: ["smfg.co.jp"],
     includePatterns: [/決算短信|financial results|summary of consolidated financial results/i],
+    urlPatterns: [/\/investor\/financial\/latest_statement\/\d{4}_3\/\d{4}_(?:[1-3]q|fy)_01\.pdf$/i],
   },
 };
 
@@ -201,6 +208,15 @@ function isFinancialDocumentTitle(value, source) {
   return source.includePatterns.some((pattern) => pattern.test(value));
 }
 
+function isFinancialDocumentUrl(url, source) {
+  return source.urlPatterns?.some((pattern) => pattern.test(url.pathname)) ?? false;
+}
+
+function isOfficialFinancialDocument(document, source) {
+  if (source.urlPatterns?.length) return isFinancialDocumentUrl(new URL(document.url), source);
+  return isFinancialDocumentTitle(`${document.title} ${document.url} ${document.context}`, source);
+}
+
 function discoverOfficialIrPdfs(html, source) {
   const documents = [];
   const seen = new Set();
@@ -222,14 +238,18 @@ function discoverOfficialIrPdfs(html, source) {
 
     seen.add(url.href);
     const fallbackTitle = decodeURIComponent(url.pathname.split("/").at(-1));
+    const contextStart = Math.max(0, match.index - 240);
+    const contextEnd = Math.min(html.length, match.index + match[0].length + 120);
     documents.push({
       title: textContent(match[3]) || fallbackTitle,
       url: url.href,
+      context: textContent(html.slice(contextStart, contextEnd)),
     });
   }
 
   return documents
-    .filter((document) => isFinancialDocumentTitle(`${document.title} ${document.url}`, source))
+    .filter((document) => isOfficialFinancialDocument(document, source))
+    .map(({ context: _context, ...document }) => document)
     .slice(0, 30);
 }
 
