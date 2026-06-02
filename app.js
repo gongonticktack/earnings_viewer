@@ -6,28 +6,21 @@ const companies = {
     name: "TOYOTA MOTOR CORPORATION",
     sourceName: "TOYOTA IR",
     sourcePage: "https://global.toyota/jp/ir/financial-results/",
-    tradingViewSymbol: "TSE:7203",
+    stockSymbol: "7203.T",
   },
   ntt: {
     code: "ntt",
     name: "NTT, INC.",
     sourceName: "NTT IR",
     sourcePage: "https://group.ntt/jp/ir/library/presentation/financial/",
-    tradingViewSymbol: "TSE:9432",
-  },
-  toshiba: {
-    code: "toshiba",
-    name: "TOSHIBA CORPORATION",
-    sourceName: "TOSHIBA IR",
-    sourcePage: "https://www.global.toshiba/jp/ir/corporate/finance.html",
-    tradingViewSymbol: null,
+    stockSymbol: "9432.T",
   },
   softbank: {
     code: "softbank",
     name: "SOFTBANK CORP.",
     sourceName: "SOFTBANK IR",
     sourcePage: "https://www.softbank.jp/corp/ir/documents/financial_reports/",
-    tradingViewSymbol: "TSE:9434",
+    stockSymbol: "9434.T",
   },
 };
 
@@ -169,48 +162,6 @@ const fallbackResults = {
       sourceUrl: "https://group.ntt/jp/newsrelease/2026/05/08/pdf/260508ab.pdf",
     },
   ],
-  toshiba: [
-    {
-      id: "toshiba-fy2024-q1", fiscalYear: 2024, quarter: 1, periodEnd: "2024-06-30",
-      revenue: 749100, operatingCost: 734800, operatingIncome: 14300, netIncome: 38300,
-      sourceUrl: "https://www.global.toshiba/content/dam/toshiba/jp/ir/corporate/finance/pdf/tpr2024q1.pdf",
-    },
-    {
-      id: "toshiba-fy2024-q2", fiscalYear: 2024, quarter: 2, periodEnd: "2024-09-30",
-      revenue: 872800, operatingCost: 816600, operatingIncome: 56200, netIncome: 78000,
-      sourceUrl: "https://www.global.toshiba/content/dam/toshiba/jp/ir/corporate/finance/pdf/tpr2024q2.pdf",
-    },
-    {
-      id: "toshiba-fy2024-q3", fiscalYear: 2024, quarter: 3, periodEnd: "2024-12-31",
-      revenue: 855100, operatingCost: 811300, operatingIncome: 43800, netIncome: 68500,
-      sourceUrl: "https://www.global.toshiba/content/dam/toshiba/jp/ir/corporate/finance/pdf/tpr2024q3.pdf",
-    },
-    {
-      id: "toshiba-fy2024-q4", fiscalYear: 2024, quarter: 4, periodEnd: "2025-03-31",
-      revenue: 1036900, operatingCost: 952700, operatingIncome: 84200, netIncome: 94200,
-      sourceUrl: "https://www.global.toshiba/content/dam/toshiba/jp/ir/corporate/finance/pdf/tpr2024q4.pdf",
-    },
-    {
-      id: "toshiba-fy2025-q1", fiscalYear: 2025, quarter: 1, periodEnd: "2025-06-30",
-      revenue: 737900, operatingCost: 697800, operatingIncome: 40100, netIncome: 146900,
-      sourceUrl: "https://www.global.toshiba/content/dam/toshiba/jp/ir/corporate/finance/pdf/tpr2025q1.pdf",
-    },
-    {
-      id: "toshiba-fy2025-q2", fiscalYear: 2025, quarter: 2, periodEnd: "2025-09-30",
-      revenue: 875900, operatingCost: 800600, operatingIncome: 75300, netIncome: 169100,
-      sourceUrl: "https://www.global.toshiba/content/dam/toshiba/jp/ir/corporate/finance/pdf/tpr2025q2.pdf",
-    },
-    {
-      id: "toshiba-fy2025-q3", fiscalYear: 2025, quarter: 3, periodEnd: "2025-12-31",
-      revenue: 908200, operatingCost: 808900, operatingIncome: 99300, netIncome: 183200,
-      sourceUrl: "https://www.global.toshiba/content/dam/toshiba/jp/ir/corporate/finance/pdf/tpr2025q3.pdf",
-    },
-    {
-      id: "toshiba-fy2025-q4", fiscalYear: 2025, quarter: 4, periodEnd: "2026-03-31",
-      revenue: 1187100, operatingCost: 1101000, operatingIncome: 86100, netIncome: 1468100,
-      sourceUrl: "https://www.global.toshiba/content/dam/toshiba/jp/ir/corporate/finance/pdf/tpr2025q4.pdf",
-    },
-  ],
   softbank: [
     {
       id: "softbank-fy2024-q1", fiscalYear: 2024, quarter: 1, periodEnd: "2024-06-30",
@@ -301,22 +252,6 @@ const annualAnalyses = {
       { label: "租税公課", value: 289141 },
     ],
   },
-  toshiba: {
-    previousFiscalYear: "FY2024",
-    currentFiscalYear: "FY2025",
-    previousOperatingIncome: 198500,
-    currentOperatingIncome: 300800,
-    previousRevenue: 3513900,
-    currentRevenue: 3709100,
-    previousOperatingCost: 3315400,
-    currentOperatingCost: 3408300,
-    operatingCashFlow: 328300,
-    investingCashFlow: 736400,
-    financingCashFlow: null,
-    previousCashAndCashEquivalents: null,
-    cashAndCashEquivalents: null,
-    expenses: [{ label: "営業費用合計", value: 3408300 }],
-  },
   softbank: {
     previousFiscalYear: "FY2024",
     currentFiscalYear: "FY2025",
@@ -342,7 +277,9 @@ const state = {
   activeId: fallbackResults.toyota.at(-1).id,
   lastSyncedAtByCompany: {},
   syncLogs: [],
-  stockChartCompanyCode: null,
+  stockChartSymbol: companies.toyota.stockSymbol,
+  renderedStockChartSymbol: null,
+  stockPrices: [],
 };
 
 const elements = {
@@ -368,6 +305,8 @@ const elements = {
   syncLogList: document.querySelector("#sync-log-list"),
   logClearButton: document.querySelector("#log-clear-button"),
   stockChart: document.querySelector("#stock-chart"),
+  stockChartStatus: document.querySelector("#stock-chart-status"),
+  stockButtons: document.querySelectorAll(".stock-symbol-button"),
 };
 
 const metricIds = ["revenue", "cost", "operating", "net"];
@@ -643,7 +582,13 @@ function drawWaterfallChart() {
     if (adjustment !== 0) {
       bars.push({ label: "その他\n調整", value: adjustment, start: runningTotal, end: currentCash });
     }
-    bars.push({ label: `${analysis.currentFiscalYear}\n期末現金`, value: currentCash, start: 0, end: currentCash, total: true });
+    bars.push({
+      label: `${analysis.currentFiscalYear}\n期末現金`,
+      value: currentCash,
+      start: currentCash,
+      end: currentCash,
+      total: true,
+    });
   }
 
   const padding = { top: 36, right: 12, bottom: 47, left: 12 };
@@ -745,52 +690,103 @@ function renderCharts() {
   drawWaterfallChart();
 }
 
-function renderStockChart() {
-  const company = companies[state.companyCode];
-  if (state.stockChartCompanyCode === state.companyCode) return;
-  state.stockChartCompanyCode = state.companyCode;
-  elements.stockChart.replaceChildren();
+function drawStockChart() {
+  const canvas = elements.stockChart;
+  const prices = state.stockPrices;
+  const { context: ctx, width, height } = prepareCanvas(canvas);
+  const padding = { top: 24, right: 22, bottom: 35, left: 62 };
+  const chartWidth = width - padding.left - padding.right;
+  const chartHeight = height - padding.top - padding.bottom;
+  const min = Math.min(...prices.map((item) => item.close));
+  const max = Math.max(...prices.map((item) => item.close));
+  const span = Math.max(max - min, 1);
+  const scaleX = (index) => padding.left + (chartWidth / Math.max(prices.length - 1, 1)) * index;
+  const scaleY = (value) => padding.top + chartHeight - ((value - min) / span) * chartHeight;
 
-  if (!company.tradingViewSymbol) {
-    const message = document.createElement("p");
-    message.className = "stock-chart-empty";
-    message.textContent = "非上場企業のため、株価チャートは表示できません。";
-    elements.stockChart.append(message);
-    return;
+  ctx.clearRect(0, 0, width, height);
+  ctx.strokeStyle = "rgba(224, 205, 165, .10)";
+  ctx.fillStyle = "#77756e";
+  ctx.font = '600 10px "Manrope"';
+  ctx.lineWidth = 1;
+
+  for (let index = 0; index < 4; index += 1) {
+    const value = min + (span / 3) * index;
+    const y = scaleY(value);
+    ctx.beginPath();
+    ctx.moveTo(padding.left, y);
+    ctx.lineTo(width - padding.right, y);
+    ctx.stroke();
+    ctx.textAlign = "right";
+    ctx.fillText(`¥${Math.round(value).toLocaleString("ja-JP")}`, padding.left - 9, y + 3);
   }
 
-  const widget = document.createElement("div");
-  widget.className = "tradingview-widget-container__widget";
-  const attribution = document.createElement("div");
-  attribution.className = "tradingview-widget-copyright";
-  const attributionLink = document.createElement("a");
-  attributionLink.href = `https://www.tradingview.com/symbols/${company.tradingViewSymbol.replace(":", "-")}/`;
-  attributionLink.target = "_blank";
-  attributionLink.rel = "noopener nofollow";
-  attributionLink.textContent = `${company.name} stock chart`;
-  attribution.append(attributionLink, " by TradingView");
-  const script = document.createElement("script");
-  script.src = "https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js";
-  script.async = true;
-  script.textContent = JSON.stringify({
-    autosize: true,
-    symbol: company.tradingViewSymbol,
-    interval: "W",
-    timezone: "Asia/Tokyo",
-    theme: "dark",
-    style: "1",
-    locale: "ja",
-    backgroundColor: "rgba(23, 21, 17, 1)",
-    gridColor: "rgba(224, 205, 165, 0.08)",
-    hide_top_toolbar: false,
-    hide_side_toolbar: true,
-    hide_legend: false,
-    hide_volume: false,
-    allow_symbol_change: false,
-    save_image: false,
-    withdateranges: true,
+  const gradient = ctx.createLinearGradient(0, padding.top, 0, padding.top + chartHeight);
+  gradient.addColorStop(0, "rgba(214, 183, 122, .26)");
+  gradient.addColorStop(1, "rgba(214, 183, 122, 0)");
+  ctx.beginPath();
+  prices.forEach((item, index) => {
+    const x = scaleX(index);
+    const y = scaleY(item.close);
+    if (index === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
   });
-  elements.stockChart.append(widget, attribution, script);
+  ctx.lineTo(scaleX(prices.length - 1), padding.top + chartHeight);
+  ctx.lineTo(scaleX(0), padding.top + chartHeight);
+  ctx.closePath();
+  ctx.fillStyle = gradient;
+  ctx.fill();
+
+  ctx.beginPath();
+  prices.forEach((item, index) => {
+    const x = scaleX(index);
+    const y = scaleY(item.close);
+    if (index === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  });
+  ctx.strokeStyle = "#d6b77a";
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  const labelIndexes = [0, Math.floor((prices.length - 1) / 2), prices.length - 1];
+  ctx.fillStyle = "#77756e";
+  ctx.textAlign = "center";
+  labelIndexes.forEach((index) => {
+    ctx.fillText(formatDate(prices[index].date), scaleX(index), height - 9);
+  });
+}
+
+async function renderStockChart() {
+  const symbol = state.stockChartSymbol;
+  if (state.renderedStockChartSymbol === symbol) return;
+  state.renderedStockChartSymbol = symbol;
+  elements.stockButtons.forEach((button) => {
+    button.classList.toggle("active", button.dataset.symbol === symbol);
+  });
+  elements.stockChartStatus.textContent = `${symbol} の週足を読み込んでいます。`;
+
+  try {
+    const payload = await fetchJson(`/api/stocks/${symbol}`);
+    const result = payload.chart?.result?.[0];
+    const timestamps = result?.timestamp ?? [];
+    const quotes = result?.indicators?.quote?.[0]?.close ?? [];
+    state.stockPrices = timestamps
+      .map((timestamp, index) => ({
+        date: new Date(timestamp * 1000).toISOString().slice(0, 10),
+        close: quotes[index],
+      }))
+      .filter((item) => Number.isFinite(item.close));
+    if (!state.stockPrices.length) throw new Error("株価データがありません。");
+    elements.stockChartStatus.textContent = `${symbol} / 週足終値 / 過去2年`;
+    drawStockChart();
+  } catch (error) {
+    const { context: ctx, width, height } = prepareCanvas(elements.stockChart);
+    ctx.clearRect(0, 0, width, height);
+    ctx.fillStyle = "#9b998f";
+    ctx.font = '600 13px "Noto Sans JP"';
+    ctx.textAlign = "center";
+    ctx.fillText("株価データを取得できませんでした。Cloudflare Workers配信後に再度お試しください。", width / 2, height / 2);
+    elements.stockChartStatus.textContent = error.message;
+  }
 }
 
 function renderCompany() {
@@ -897,7 +893,9 @@ async function fetchJson(url, options = {}) {
     const detail = payload.error ?? payload.message;
     const detailText = detail ? `: ${detail}` : "";
     const stage = payload.stage ? ` [${payload.stage}]` : "";
-    throw new Error(`データ取得に失敗しました (${response.status})${stage}${detailText} @ ${new URL(url).pathname}`);
+    throw new Error(
+      `データ取得に失敗しました (${response.status})${stage}${detailText} @ ${new URL(url, window.location.href).pathname}`,
+    );
   }
   const text = await response.text();
   return text ? JSON.parse(text) : null;
@@ -1092,6 +1090,7 @@ elements.quarterSelect.addEventListener("change", (event) => {
 elements.companyButtons.forEach((button) => {
   button.addEventListener("click", async () => {
     state.companyCode = button.dataset.company;
+    state.stockChartSymbol = companies[state.companyCode].stockSymbol;
     state.results = state.resultsByCompany[state.companyCode];
     state.activeId = state.results.at(-1).id;
     updateLatestUpdate();
@@ -1099,12 +1098,21 @@ elements.companyButtons.forEach((button) => {
     await refreshCompany();
   });
 });
+elements.stockButtons.forEach((button) => {
+  button.addEventListener("click", () => {
+    state.stockChartSymbol = button.dataset.symbol;
+    renderStockChart();
+  });
+});
 elements.syncButton.addEventListener("click", () => refreshCompany({ force: true, notify: true }));
 elements.logClearButton.addEventListener("click", () => {
   state.syncLogs = [];
   renderSyncLogs();
 });
-window.addEventListener("resize", renderCharts);
+window.addEventListener("resize", () => {
+  renderCharts();
+  if (state.stockPrices.length) drawStockChart();
+});
 
 updateLatestUpdate();
 render();

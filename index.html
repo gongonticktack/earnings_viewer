@@ -39,10 +39,6 @@
             <span class="company-monogram">N</span>
             <span><strong>NTT</strong><small>9432</small></span>
           </button>
-          <button class="company-button" data-company="toshiba" type="button">
-            <span class="company-monogram">T</span>
-            <span><strong>TOSHIBA</strong><small>PRIVATE</small></span>
-          </button>
           <button class="company-button" data-company="softbank" type="button">
             <span class="company-monogram">S</span>
             <span><strong>SOFTBANK</strong><small>9434</small></span>
@@ -241,7 +237,7 @@
             </aside>
           </div>
           <p class="flow-note">
-            決算PDFに掲載されていない項目は「開示なし」と表示します。東芝の登録済みPDFでは財務活動CFと期末現金残高が開示されていません。
+            各活動CFだけで期末残高に一致しない場合は、為替影響などを「その他調整」として表示します。
           </p>
         </section>
 
@@ -254,11 +250,32 @@
             <span class="flow-period">WEEKLY</span>
           </div>
           <p class="panel-description">
-            表示中の企業の週足株価チャートです。上場企業の市場データはTradingViewから読み込みます。
+            表示中の企業と時価総額上位企業の週足終値です。市場データは無料の株価JSONから読み込みます。
           </p>
-          <div class="stock-chart">
-            <div class="tradingview-widget-container" id="stock-chart"></div>
+          <div class="stock-symbols" aria-label="時価総額上位企業の株価チャート">
+            <button class="stock-symbol-button active" data-symbol="7203.T" type="button">
+              TOYOTA <small>7203</small>
+            </button>
+            <button class="stock-symbol-button" data-symbol="9984.T" type="button">
+              SOFTBANK GROUP <small>9984</small>
+            </button>
+            <button class="stock-symbol-button" data-symbol="8306.T" type="button">
+              MUFG <small>8306</small>
+            </button>
+            <button class="stock-symbol-button" data-symbol="9983.T" type="button">
+              FAST RETAILING <small>9983</small>
+            </button>
+            <button class="stock-symbol-button" data-symbol="6501.T" type="button">
+              HITACHI <small>6501</small>
+            </button>
+            <button class="stock-symbol-button" data-symbol="8316.T" type="button">
+              SMFG <small>8316</small>
+            </button>
           </div>
+          <div class="stock-chart">
+            <canvas id="stock-chart"></canvas>
+          </div>
+          <p class="stock-chart-status" id="stock-chart-status">週足を読み込んでいます。</p>
         </section>
 
         <section class="panel documents-panel" id="documents">

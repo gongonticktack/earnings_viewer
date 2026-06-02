@@ -8,7 +8,6 @@
 
 - トヨタ自動車
 - NTT
-- 東芝
 - ソフトバンク
 
 各社とも直近2年度分の四半期データを表示します。
@@ -16,6 +15,8 @@
 ## ローカル表示
 
 静的ファイルだけでデモ表示できます。`index.html` をブラウザで直接開いてください。
+
+株価チャートは `/api/stocks/:symbol` を使うため、ローカルで `index.html` を直接開いた場合は表示されません。Cloudflare Workers へ配信した環境で有効になります。
 
 ローカルサーバーを使う場合は、Python がインストールされていれば次のコマンドでも表示できます。
 
@@ -50,11 +51,12 @@ python -m http.server 5173
 ## データの扱い
 
 - 現在の数値はランダムなサンプルではなく、公式IR資料をもとにJSへ登録したデータです。ただし、公式サイトからのリアルタイム自動取得ではありません。
-- 出典は [トヨタ自動車 決算資料](https://global.toyota/jp/ir/financial-results/)、[NTT 決算説明会資料](https://group.ntt/jp/ir/library/presentation/financial/)、[東芝 財務・業績](https://www.global.toshiba/jp/ir/corporate/finance.html)、[ソフトバンク 決算短信](https://www.softbank.jp/corp/ir/documents/financial_reports/) です。
+- 出典は [トヨタ自動車 決算資料](https://global.toyota/jp/ir/financial-results/)、[NTT 決算説明会資料](https://group.ntt/jp/ir/library/presentation/financial/)、[ソフトバンク 決算短信](https://www.softbank.jp/corp/ir/documents/financial_reports/) です。
 - 表示単位は百万円です。カードでは十億円へ変換しています。
 - 公式資料の累計値から前四半期累計を差し引き、四半期単独値を保存しています。
 - 営業コストは `営業収益 - 営業利益` の算出値です。
 - キャッシュフロー欄には、前期末現金から今期末現金までの増減をウォーターフォールで表示します。営業活動CF、投資活動CF、財務活動CFと、為替影響などのその他調整を確認できます。
-- 株価欄には、TradingViewから読み込んだ週足チャートを表示します。非上場の東芝は株価チャートを表示しません。
+- 株価欄には、Cloudflare Worker 経由で無料の株価JSONから読み込んだ週足チャートを表示します。トヨタ自動車と、時価総額上位のソフトバンクグループ、三菱UFJ FG、ファーストリテイリング、日立製作所、三井住友FGを切り替えられます。
+- 追加5社は公式IR URL付きで `earn_companies` に登録します。四半期数値は未登録です。MUFG と三井住友FGは銀行業のため、現在の営業利益中心の共通スキーマへそのまま登録せず、銀行向け指標を追加してから対応します。
 
-現在はトヨタ FY2025〜FY2026、NTT FY2024〜FY2025、東芝 FY2024〜FY2025、ソフトバンク FY2024〜FY2025 の登録済み四半期データをブラウザからDBへ保存します。ブラウザから公式IRページを直接取得するとCORS制限を受けるため、新しい決算発表を完全自動で解析して追加する場合はサーバー側の処理が必要です。
+現在はトヨタ FY2025〜FY2026、NTT FY2024〜FY2025、ソフトバンク FY2024〜FY2025 の登録済み四半期データをブラウザからDBへ保存します。ブラウザから公式IRページを直接取得するとCORS制限を受けるため、新しい決算発表を完全自動で解析して追加する場合はサーバー側の処理が必要です。
