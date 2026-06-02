@@ -59,6 +59,9 @@
           <a class="nav-item" href="#annual-flow">
             <span class="nav-icon">↝</span> Annual Flow
           </a>
+          <a class="nav-item" href="#stock-price">
+            <span class="nav-icon">↗</span> Weekly Stock
+          </a>
           <a class="nav-item" href="#documents">
             <span class="nav-icon">▤</span> Documents
           </a>
@@ -198,13 +201,18 @@
             <span class="flow-period" id="flow-period">—</span>
           </div>
           <p class="panel-description">
-            決算PDFに記載された営業活動・投資活動・財務活動のキャッシュフローと期末現金残高を表示します。
+            前期末現金から今期末現金まで、営業活動・投資活動・財務活動とその他調整による増減を表示します。
           </p>
           <div class="flow-layout">
             <div class="waterfall-wrap">
               <canvas id="waterfall-chart"></canvas>
             </div>
             <aside class="flow-summary">
+              <div class="investment-card">
+                <small>CASH AT START OF YEAR</small>
+                <strong id="previous-cash-and-cash-equivalents">—</strong>
+                <span>前期末の現金及び現金同等物残高</span>
+              </div>
               <div class="investment-card">
                 <small>OPERATING CASH FLOW</small>
                 <strong id="operating-cash-flow">—</strong>
@@ -221,6 +229,11 @@
                 <span>財務活動によるキャッシュフロー</span>
               </div>
               <div class="investment-card">
+                <small>OTHER ADJUSTMENTS</small>
+                <strong id="other-cash-flow-adjustment">—</strong>
+                <span>為替影響など、各活動CF以外の増減</span>
+              </div>
+              <div class="investment-card">
                 <small>CASH AT END OF YEAR</small>
                 <strong id="cash-and-cash-equivalents">—</strong>
                 <span>現金及び現金同等物の期末残高</span>
@@ -230,6 +243,22 @@
           <p class="flow-note">
             決算PDFに掲載されていない項目は「開示なし」と表示します。東芝の登録済みPDFでは財務活動CFと期末現金残高が開示されていません。
           </p>
+        </section>
+
+        <section class="panel stock-chart-panel" id="stock-price">
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">MARKET PERFORMANCE</p>
+              <h3>Weekly Stock Price</h3>
+            </div>
+            <span class="flow-period">WEEKLY</span>
+          </div>
+          <p class="panel-description">
+            表示中の企業の週足株価チャートです。上場企業の市場データはTradingViewから読み込みます。
+          </p>
+          <div class="stock-chart">
+            <div class="tradingview-widget-container" id="stock-chart"></div>
+          </div>
         </section>
 
         <section class="panel documents-panel" id="documents">
@@ -281,7 +310,6 @@
     </div>
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
-    <script type="module" src="./config.js"></script>
     <script type="module" src="./app.js"></script>
   </body>
 </html>

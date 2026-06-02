@@ -1,27 +1,33 @@
+import "./config.js";
+
 const companies = {
   toyota: {
     code: "toyota",
     name: "TOYOTA MOTOR CORPORATION",
     sourceName: "TOYOTA IR",
     sourcePage: "https://global.toyota/jp/ir/financial-results/",
+    tradingViewSymbol: "TSE:7203",
   },
   ntt: {
     code: "ntt",
     name: "NTT, INC.",
     sourceName: "NTT IR",
     sourcePage: "https://group.ntt/jp/ir/library/presentation/financial/",
+    tradingViewSymbol: "TSE:9432",
   },
   toshiba: {
     code: "toshiba",
     name: "TOSHIBA CORPORATION",
     sourceName: "TOSHIBA IR",
     sourcePage: "https://www.global.toshiba/jp/ir/corporate/finance.html",
+    tradingViewSymbol: null,
   },
   softbank: {
     code: "softbank",
     name: "SOFTBANK CORP.",
     sourceName: "SOFTBANK IR",
     sourcePage: "https://www.softbank.jp/corp/ir/documents/financial_reports/",
+    tradingViewSymbol: "TSE:9434",
   },
 };
 
@@ -264,6 +270,7 @@ const annualAnalyses = {
     operatingCashFlow: 5472920,
     investingCashFlow: -1520307,
     financingCashFlow: -536659,
+    previousCashAndCashEquivalents: 8982404,
     cashAndCashEquivalents: 12659622,
     expenses: [
       { label: "売上原価", value: 39141418 },
@@ -283,6 +290,7 @@ const annualAnalyses = {
     operatingCashFlow: 1485190,
     investingCashFlow: -1023424,
     financingCashFlow: 441332,
+    previousCashAndCashEquivalents: 1000994,
     cashAndCashEquivalents: 1921882,
     expenses: [
       { label: "人件費", value: 3214887 },
@@ -305,6 +313,7 @@ const annualAnalyses = {
     operatingCashFlow: 328300,
     investingCashFlow: 736400,
     financingCashFlow: null,
+    previousCashAndCashEquivalents: null,
     cashAndCashEquivalents: null,
     expenses: [{ label: "営業費用合計", value: 3408300 }],
   },
@@ -320,6 +329,7 @@ const annualAnalyses = {
     operatingCashFlow: 1393760,
     investingCashFlow: -1270806,
     financingCashFlow: -136854,
+    previousCashAndCashEquivalents: 1435525,
     cashAndCashEquivalents: 1438799,
     expenses: [{ label: "営業費用合計", value: 5996104 }],
   },
@@ -332,6 +342,7 @@ const state = {
   activeId: fallbackResults.toyota.at(-1).id,
   lastSyncedAtByCompany: {},
   syncLogs: [],
+  stockChartCompanyCode: null,
 };
 
 const elements = {
@@ -348,12 +359,15 @@ const elements = {
   irLink: document.querySelector("#ir-link"),
   companyButtons: document.querySelectorAll(".company-button"),
   flowPeriod: document.querySelector("#flow-period"),
+  previousCashAndCashEquivalents: document.querySelector("#previous-cash-and-cash-equivalents"),
   operatingCashFlow: document.querySelector("#operating-cash-flow"),
   investmentCashFlow: document.querySelector("#investment-cash-flow"),
   financingCashFlow: document.querySelector("#financing-cash-flow"),
+  otherCashFlowAdjustment: document.querySelector("#other-cash-flow-adjustment"),
   cashAndCashEquivalents: document.querySelector("#cash-and-cash-equivalents"),
   syncLogList: document.querySelector("#sync-log-list"),
   logClearButton: document.querySelector("#log-clear-button"),
+  stockChart: document.querySelector("#stock-chart"),
 };
 
 const metricIds = ["revenue", "cost", "operating", "net"];
@@ -605,18 +619,39 @@ function drawWaterfallChart() {
   const canvas = document.querySelector("#waterfall-chart");
   const { context: ctx, width, height } = prepareCanvas(canvas);
   const analysis = annualAnalyses[state.companyCode];
-  const bars = [
+  const previousCash = analysis.previousCashAndCashEquivalents;
+  const currentCash = analysis.cashAndCashEquivalents;
+  const flowBars = [
     { label: "営業活動\nCF", value: analysis.operatingCashFlow },
     { label: "投資活動\nCF", value: analysis.investingCashFlow },
     { label: "財務活動\nCF", value: analysis.financingCashFlow },
-    { label: "期末現金\n残高", value: analysis.cashAndCashEquivalents, total: true },
-  ];
+  ].filter((bar) => bar.value !== null);
+  const canReconcile = previousCash !== null && currentCash !== null;
+  let runningTotal = canReconcile ? previousCash : 0;
+  const bars = canReconcile
+    ? [{ label: `${analysis.previousFiscalYear}\n期末現金`, value: previousCash, start: 0, end: previousCash, total: true }]
+    : [];
+
+  flowBars.forEach((bar) => {
+    const start = runningTotal;
+    runningTotal += bar.value;
+    bars.push({ ...bar, start, end: runningTotal });
+  });
+
+  if (canReconcile) {
+    const adjustment = calculateCashFlowAdjustment(analysis);
+    if (adjustment !== 0) {
+      bars.push({ label: "その他\n調整", value: adjustment, start: runningTotal, end: currentCash });
+    }
+    bars.push({ label: `${analysis.currentFiscalYear}\n期末現金`, value: currentCash, start: 0, end: currentCash, total: true });
+  }
+
   const padding = { top: 36, right: 12, bottom: 47, left: 12 };
   const chartWidth = width - padding.left - padding.right;
   const chartHeight = height - padding.top - padding.bottom;
   const gap = chartWidth / bars.length;
   const barWidth = Math.min(76, gap * 0.54);
-  const availableValues = bars.map((bar) => bar.value).filter((value) => value !== null);
+  const availableValues = bars.flatMap((bar) => [bar.start, bar.end]);
   const min = Math.min(0, ...availableValues);
   const max = Math.max(0, ...availableValues);
   const span = Math.max(max - min, 1);
@@ -641,21 +676,40 @@ function drawWaterfallChart() {
   ctx.strokeStyle = "rgba(224, 205, 165, .28)";
   ctx.stroke();
 
+  if (!canReconcile) {
+    ctx.fillStyle = "#9b998f";
+    ctx.font = '600 12px "Noto Sans JP"';
+    ctx.textAlign = "center";
+    ctx.fillText("期首・期末現金残高の開示がないため、増減のみを表示しています。", width / 2, padding.top + 18);
+  }
+
   bars.forEach((bar, index) => {
     const x = padding.left + gap * index + gap / 2;
-    if (bar.value !== null) {
-      const valueY = scaleY(bar.value);
-      const top = Math.min(valueY, zeroY);
-      const bottom = Math.max(valueY, zeroY);
-      ctx.fillStyle = bar.total ? "rgba(214, 183, 122, .68)" : bar.value >= 0 ? "#82ba8e" : "#d8867f";
-      ctx.fillRect(x - barWidth / 2, top, barWidth, Math.max(3, bottom - top));
+    const startY = scaleY(bar.start);
+    const endY = scaleY(bar.end);
+    const top = bar.total ? endY : Math.min(startY, endY);
+    const bottom = bar.total ? zeroY : Math.max(startY, endY);
+
+    if (index > 0) {
+      const previousBar = bars[index - 1];
+      const previousX = padding.left + gap * (index - 1) + gap / 2;
+      ctx.beginPath();
+      ctx.moveTo(previousX + barWidth / 2, scaleY(previousBar.end));
+      ctx.lineTo(x - barWidth / 2, scaleY(bar.start));
+      ctx.strokeStyle = "rgba(224, 205, 165, .38)";
+      ctx.setLineDash([3, 3]);
+      ctx.stroke();
+      ctx.setLineDash([]);
     }
 
-    ctx.fillStyle = bar.total ? "#d6b77a" : bar.value === null ? "#77756e" : bar.value >= 0 ? "#82ba8e" : "#d8867f";
+    ctx.fillStyle = bar.total ? "rgba(214, 183, 122, .68)" : bar.value >= 0 ? "#82ba8e" : "#d8867f";
+    ctx.fillRect(x - barWidth / 2, Math.min(top, bottom), barWidth, Math.max(3, Math.abs(bottom - top)));
+
+    ctx.fillStyle = bar.total ? "#d6b77a" : bar.value >= 0 ? "#82ba8e" : "#d8867f";
     ctx.font = '700 10px "Manrope"';
     ctx.textAlign = "center";
-    const valueLabel = bar.value === null ? "開示なし" : `${bar.value >= 0 && !bar.total ? "+" : ""}${formatBillions(bar.value)}`;
-    const labelY = bar.value === null ? zeroY - 10 : scaleY(bar.value) + (bar.value < 0 ? 16 : -10);
+    const valueLabel = `${bar.value >= 0 && !bar.total ? "+" : ""}${formatBillions(bar.value)}`;
+    const labelY = endY + (bar.value < 0 && !bar.total ? 16 : -10);
     ctx.fillText(valueLabel, x, labelY);
 
     ctx.fillStyle = "#9b998f";
@@ -666,12 +720,22 @@ function drawWaterfallChart() {
   });
 }
 
+function calculateCashFlowAdjustment(analysis) {
+  if (analysis.previousCashAndCashEquivalents === null || analysis.cashAndCashEquivalents === null) return null;
+  const disclosedFlows = [analysis.operatingCashFlow, analysis.investingCashFlow, analysis.financingCashFlow]
+    .filter((value) => value !== null)
+    .reduce((total, value) => total + value, 0);
+  return analysis.cashAndCashEquivalents - analysis.previousCashAndCashEquivalents - disclosedFlows;
+}
+
 function renderAnnualFlow() {
   const analysis = annualAnalyses[state.companyCode];
   elements.flowPeriod.textContent = analysis.currentFiscalYear;
+  elements.previousCashAndCashEquivalents.textContent = formatOptionalBillions(analysis.previousCashAndCashEquivalents);
   elements.operatingCashFlow.textContent = formatOptionalBillions(analysis.operatingCashFlow);
   elements.investmentCashFlow.textContent = formatOptionalBillions(analysis.investingCashFlow);
   elements.financingCashFlow.textContent = formatOptionalBillions(analysis.financingCashFlow);
+  elements.otherCashFlowAdjustment.textContent = formatOptionalBillions(calculateCashFlowAdjustment(analysis));
   elements.cashAndCashEquivalents.textContent = formatOptionalBillions(analysis.cashAndCashEquivalents);
 }
 
@@ -679,6 +743,54 @@ function renderCharts() {
   drawPerformanceChart();
   drawMarginChart();
   drawWaterfallChart();
+}
+
+function renderStockChart() {
+  const company = companies[state.companyCode];
+  if (state.stockChartCompanyCode === state.companyCode) return;
+  state.stockChartCompanyCode = state.companyCode;
+  elements.stockChart.replaceChildren();
+
+  if (!company.tradingViewSymbol) {
+    const message = document.createElement("p");
+    message.className = "stock-chart-empty";
+    message.textContent = "非上場企業のため、株価チャートは表示できません。";
+    elements.stockChart.append(message);
+    return;
+  }
+
+  const widget = document.createElement("div");
+  widget.className = "tradingview-widget-container__widget";
+  const attribution = document.createElement("div");
+  attribution.className = "tradingview-widget-copyright";
+  const attributionLink = document.createElement("a");
+  attributionLink.href = `https://www.tradingview.com/symbols/${company.tradingViewSymbol.replace(":", "-")}/`;
+  attributionLink.target = "_blank";
+  attributionLink.rel = "noopener nofollow";
+  attributionLink.textContent = `${company.name} stock chart`;
+  attribution.append(attributionLink, " by TradingView");
+  const script = document.createElement("script");
+  script.src = "https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js";
+  script.async = true;
+  script.textContent = JSON.stringify({
+    autosize: true,
+    symbol: company.tradingViewSymbol,
+    interval: "W",
+    timezone: "Asia/Tokyo",
+    theme: "dark",
+    style: "1",
+    locale: "ja",
+    backgroundColor: "rgba(23, 21, 17, 1)",
+    gridColor: "rgba(224, 205, 165, 0.08)",
+    hide_top_toolbar: false,
+    hide_side_toolbar: true,
+    hide_legend: false,
+    hide_volume: false,
+    allow_symbol_change: false,
+    save_image: false,
+    withdateranges: true,
+  });
+  elements.stockChart.append(widget, attribution, script);
 }
 
 function renderCompany() {
@@ -698,6 +810,7 @@ function render() {
   renderDocuments();
   renderAnnualFlow();
   renderCharts();
+  renderStockChart();
 }
 
 function showToast(message) {
@@ -860,6 +973,7 @@ function serializeAnnualFlow(companyCode, item) {
     operating_cash_flow: item.operatingCashFlow,
     investing_cash_flow: item.investingCashFlow,
     financing_cash_flow: item.financingCashFlow,
+    previous_cash_and_cash_equivalents: item.previousCashAndCashEquivalents,
     cash_and_cash_equivalents: item.cashAndCashEquivalents,
     expense_breakdown: item.expenses,
     source_url: fallbackResults[companyCode].at(-1).sourceUrl,
@@ -963,6 +1077,8 @@ function normalizeAnnualFlow(item) {
     operatingCashFlow: item.operating_cash_flow ?? item.operatingCashFlow,
     investingCashFlow: item.investing_cash_flow ?? item.investingCashFlow,
     financingCashFlow: item.financing_cash_flow ?? item.financingCashFlow ?? null,
+    previousCashAndCashEquivalents:
+      item.previous_cash_and_cash_equivalents ?? item.previousCashAndCashEquivalents ?? null,
     cashAndCashEquivalents: item.cash_and_cash_equivalents ?? item.cashAndCashEquivalents ?? null,
     expenses: item.expense_breakdown ?? item.expenses,
   };

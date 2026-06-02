@@ -787,6 +787,49 @@ select {
   margin-top: 13px;
 }
 
+.stock-chart-panel {
+  margin-top: 17px;
+}
+
+.stock-chart {
+  height: 430px;
+  margin-top: 19px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: rgba(23, 21, 17, 0.9);
+}
+
+.stock-chart > .tradingview-widget-container {
+  height: 100%;
+  width: 100%;
+}
+
+.stock-chart .tradingview-widget-container__widget {
+  height: calc(100% - 24px);
+  width: 100%;
+}
+
+.stock-chart .tradingview-widget-copyright {
+  height: 24px;
+  padding: 5px 8px 0;
+  color: var(--dim);
+  font-size: 9px;
+}
+
+.stock-chart .tradingview-widget-copyright a {
+  color: var(--gold-soft);
+}
+
+.stock-chart-empty {
+  display: grid;
+  height: 100%;
+  margin: 0;
+  place-items: center;
+  color: var(--dim);
+  font-size: 12px;
+}
+
 .external-link {
   color: var(--gold);
   font-size: 11px;
