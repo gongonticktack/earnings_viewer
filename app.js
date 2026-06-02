@@ -12,7 +12,7 @@ const companies = {
     code: "ntt",
     name: "NTT, INC.",
     sourceName: "NTT IR",
-    sourcePage: "https://group.ntt/jp/ir/library/presentation/financial/",
+    sourcePage: "https://group.ntt/jp/ir/library/results/",
     stockSymbol: "9432.T",
   },
   "softbank-group": {
@@ -26,14 +26,14 @@ const companies = {
     code: "mufg",
     name: "MITSUBISHI UFJ FINANCIAL GROUP",
     sourceName: "MUFG IR",
-    sourcePage: "https://www.mufg.jp/ir/index.html",
+    sourcePage: "https://www.mufg.jp/ir/fs/index.html?link_id=ir_contents_fs",
     stockSymbol: "8306.T",
   },
   "fast-retailing": {
     code: "fast-retailing",
     name: "FAST RETAILING CO., LTD.",
     sourceName: "FAST RETAILING IR",
-    sourcePage: "https://www.fastretailing.com/jp/ir/",
+    sourcePage: "https://www.fastretailing.com/jp/ir/library/tanshin.html",
     stockSymbol: "9983.T",
   },
   hitachi: {

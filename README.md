@@ -69,7 +69,7 @@ curl.exe -X POST "https://<worker-domain>/api/edinet/sync?date=2026-06-01"
 ## データの扱い
 
 - 現在の数値はランダムなサンプルではなく、公式IR資料をもとにJSへ登録したデータです。ただし、公式サイトからのリアルタイム自動取得ではありません。
-- 出典は [トヨタ自動車 決算資料](https://global.toyota/jp/ir/financial-results/)、[NTT 決算説明会資料](https://group.ntt/jp/ir/library/presentation/financial/)、[ソフトバンクグループ 決算資料](https://group.softbank/ir/financials/financial_reports) です。
+- 出典は [トヨタ自動車 決算資料](https://global.toyota/jp/ir/financial-results/)、[NTT 決算短信等](https://group.ntt/jp/ir/library/results/)、[ソフトバンクグループ 決算資料](https://group.softbank/ir/financials/financial_reports) です。
 - DBへ保存する単位は百万円です。画面では兆・億円へ変換しています。
 - 公式資料の累計値から前四半期累計を差し引き、四半期単独値を保存しています。
 - 営業コストは `営業収益 - 営業利益` の算出値です。

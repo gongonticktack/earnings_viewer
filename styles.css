@@ -619,6 +619,18 @@ select {
   margin-top: 17px;
 }
 
+.documents-panel .table-wrap {
+  max-height: 360px;
+  overflow-y: auto;
+}
+
+.documents-panel th {
+  position: sticky;
+  z-index: 1;
+  top: 0;
+  background: var(--panel-strong);
+}
+
 .sync-log-panel {
   margin-top: 17px;
 }

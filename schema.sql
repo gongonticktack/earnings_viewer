@@ -13,10 +13,10 @@ alter table public.earn_companies
 insert into public.earn_companies (code, name, stock_code, ir_url)
 values
   ('toyota', 'トヨタ自動車', '7203', 'https://global.toyota/jp/ir/financial-results/'),
-  ('ntt', 'NTT', '9432', 'https://group.ntt/jp/ir/library/presentation/financial/'),
+  ('ntt', 'NTT', '9432', 'https://group.ntt/jp/ir/library/results/'),
   ('softbank-group', 'ソフトバンクグループ', '9984', 'https://group.softbank/ir/financials/financial_reports'),
-  ('mufg', '三菱UFJフィナンシャル・グループ', '8306', 'https://www.mufg.jp/ir/index.html'),
-  ('fast-retailing', 'ファーストリテイリング', '9983', 'https://www.fastretailing.com/jp/ir/'),
+  ('mufg', '三菱UFJフィナンシャル・グループ', '8306', 'https://www.mufg.jp/ir/fs/index.html?link_id=ir_contents_fs'),
+  ('fast-retailing', 'ファーストリテイリング', '9983', 'https://www.fastretailing.com/jp/ir/library/tanshin.html'),
   ('hitachi', '日立製作所', '6501', 'https://www.hitachi.com/ja-jp/ir/library/fr/'),
   ('smfg', '三井住友フィナンシャルグループ', '8316', 'https://www.smfg.co.jp/investor/financial/latest_statement.html')
 on conflict (code) do update set

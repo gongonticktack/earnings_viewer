@@ -16,30 +16,37 @@ const irSources = {
   toyota: {
     sourcePage: "https://global.toyota/jp/ir/financial-results/",
     allowedDomains: ["global.toyota"],
+    includePatterns: [/決算要旨|financial results|financial summary|summary of consolidated financial results/i],
   },
   ntt: {
-    sourcePage: "https://group.ntt/jp/ir/library/presentation/financial/",
+    sourcePage: "https://group.ntt/jp/ir/library/results/",
     allowedDomains: ["group.ntt", "ntt.jp"],
+    includePatterns: [/決算短信|financial results|earnings release|summary of consolidated financial results/i],
   },
   "softbank-group": {
     sourcePage: "https://group.softbank/ir/financials/financial_reports",
     allowedDomains: ["group.softbank"],
+    includePatterns: [/決算短信|financial report|financial results|earnings results/i],
   },
   mufg: {
-    sourcePage: "https://www.mufg.jp/ir/index.html",
+    sourcePage: "https://www.mufg.jp/ir/fs/index.html?link_id=ir_contents_fs",
     allowedDomains: ["mufg.jp"],
+    includePatterns: [/決算短信/i],
   },
   "fast-retailing": {
-    sourcePage: "https://www.fastretailing.com/jp/ir/library/earning.html",
+    sourcePage: "https://www.fastretailing.com/jp/ir/library/tanshin.html",
     allowedDomains: ["fastretailing.com"],
+    includePatterns: [/決算短信|financial results|summary of consolidated financial results/i],
   },
   hitachi: {
     sourcePage: "https://www.hitachi.com/ja-jp/ir/library/fr/",
     allowedDomains: ["hitachi.com"],
+    includePatterns: [/決算短信|financial results|earnings release|summary of consolidated financial results/i],
   },
   smfg: {
     sourcePage: "https://www.smfg.co.jp/investor/financial/latest_statement.html",
     allowedDomains: ["smfg.co.jp"],
+    includePatterns: [/決算短信|financial results|summary of consolidated financial results/i],
   },
 };
 
@@ -190,8 +197,8 @@ function isAllowedDomain(hostname, domains) {
   return domains.some((domain) => hostname === domain || hostname.endsWith(`.${domain}`));
 }
 
-function isFinancialDocumentTitle(value) {
-  return /決算|四半期|financial|earnings|quarter|results|report|presentation|summary/i.test(value);
+function isFinancialDocumentTitle(value, source) {
+  return source.includePatterns.some((pattern) => pattern.test(value));
 }
 
 function discoverOfficialIrPdfs(html, source) {
@@ -221,8 +228,9 @@ function discoverOfficialIrPdfs(html, source) {
     });
   }
 
-  const financialDocuments = documents.filter((document) => isFinancialDocumentTitle(`${document.title} ${document.url}`));
-  return (financialDocuments.length ? financialDocuments : documents).slice(0, 30);
+  return documents
+    .filter((document) => isFinancialDocumentTitle(`${document.title} ${document.url}`, source))
+    .slice(0, 30);
 }
 
 async function fetchOfficialIrDocuments(companyCode) {
