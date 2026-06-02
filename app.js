@@ -956,8 +956,8 @@ function updateSyncButtonAvailability({ loading = false } = {}) {
   elements.syncButton.disabled = loading;
   elements.syncButton.title = isSupported
     ? "JSへ登録済みの公式IRデータをDBへ再保存します。"
-    : "公式IRサイトから最新の資料一覧を取得します。";
-  elements.syncButtonLabel.textContent = isSupported ? "今すぐ再取得" : "IR資料を取得";
+    : "公式IRサイトから最新資料を取得し、決算PDFを解析します。";
+  elements.syncButtonLabel.textContent = isSupported ? "今すぐ再取得" : "IR資料を解析";
 }
 
 function addSyncLog(level, stage, message, companyCode = state.companyCode) {
@@ -1105,7 +1105,42 @@ async function loadCachedCompanyData(companyCode, config) {
   return state.lastSyncedAtByCompany[companyCode];
 }
 
-async function loadOfficialIrDocuments(companyCode) {
+function selectFinancialDocument(documents) {
+  return documents.find(
+    (document) =>
+      document.type === "PDF"
+      && /決算短信|決算報告|financial report|quarterly results|earnings results|financial results/i.test(document.title),
+  ) ?? documents.find((document) => document.type === "PDF");
+}
+
+async function saveIrDocumentExtraction(companyCode, payload, config) {
+  if (!config.supabaseUrl || !config.supabaseAnonKey) return;
+  const idBuffer = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(payload.sourceUrl));
+  const id = `${companyCode}-${[...new Uint8Array(idBuffer)]
+    .slice(0, 12)
+    .map((item) => item.toString(16).padStart(2, "0"))
+    .join("")}`;
+  await fetchJsonWithSyncLog(
+    `${config.supabaseUrl}/rest/v1/earn_ir_document_extractions?on_conflict=company_code,source_url`,
+    {
+      method: "POST",
+      headers: restWriteHeaders(config),
+      body: JSON.stringify({
+        id,
+        company_code: companyCode,
+        source_url: payload.sourceUrl,
+        document_name: payload.name,
+        markdown_text: payload.markdown,
+        extracted_data: payload.extraction,
+        confidence: payload.extraction.confidence,
+        reviewed: false,
+      }),
+    },
+    { companyCode, stage: "PDF解析結果保存", description: "PDF本文と抽出候補" },
+  );
+}
+
+async function loadOfficialIrDocuments(companyCode, config, { extract = false } = {}) {
   addSyncLog("info", "公式IR資料取得 開始", "公式IRサイトへ最新資料を問い合わせています。", companyCode);
   try {
     const payload = await fetchJson(`/api/ir/${companyCode}`);
@@ -1116,7 +1151,38 @@ async function loadOfficialIrDocuments(companyCode) {
       `${state.irDocumentsByCompany[companyCode].length}件の公式IR資料を読み込みました。`,
       companyCode,
     );
-    return { documents: state.irDocumentsByCompany[companyCode].length, officialIr: true };
+    if (!extract) return { documents: state.irDocumentsByCompany[companyCode].length, officialIr: true };
+
+    const financialDocument = selectFinancialDocument(state.irDocumentsByCompany[companyCode]);
+    if (!financialDocument) {
+      addSyncLog("error", "決算PDF選定 失敗", "解析対象にできるPDFが公式IRページで見つかりませんでした。", companyCode);
+      return { documents: state.irDocumentsByCompany[companyCode].length, officialIr: true, irExtractionFailed: true };
+    }
+
+    addSyncLog("info", "決算PDF解析 開始", financialDocument.title, companyCode);
+    try {
+      const extraction = await fetchJson(`/api/ir/${companyCode}/extract`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: financialDocument.url }),
+      });
+      await saveIrDocumentExtraction(companyCode, extraction, config);
+      addSyncLog(
+        "success",
+        "決算PDF解析 完了",
+        `抽出候補を保存しました。信頼度 ${Math.round(extraction.extraction.confidence * 100)}%。レビュー後に画面用データへ反映できます。`,
+        companyCode,
+      );
+      return {
+        documents: state.irDocumentsByCompany[companyCode].length,
+        officialIr: true,
+        extracted: true,
+        confidence: extraction.extraction.confidence,
+      };
+    } catch (error) {
+      addSyncLog("error", "決算PDF解析 失敗", error.message, companyCode);
+      return { documents: state.irDocumentsByCompany[companyCode].length, officialIr: true, irExtractionFailed: true };
+    }
   } catch (error) {
     state.irDocumentsByCompany[companyCode] = [];
     addSyncLog("error", "公式IR資料取得 失敗", error.message, companyCode);
@@ -1234,12 +1300,16 @@ async function refreshCompany({ force = false, notify = false } = {}) {
   try {
     if (!config.supabaseUrl || !config.supabaseAnonKey) {
       if (!hasRegisteredSourceData(companyCode)) {
-        const payload = await loadOfficialIrDocuments(companyCode);
+        const payload = await loadOfficialIrDocuments(companyCode, config, { extract: force });
         if (state.companyCode === companyCode) render();
         if (notify) {
           showToast(
             payload.irDiscoveryFailed
               ? "公式IR資料を取得できませんでした。"
+              : payload.irExtractionFailed
+              ? "決算PDFを解析できませんでした。"
+              : payload.extracted
+              ? `決算PDFを解析しました。信頼度 ${Math.round(payload.confidence * 100)}%。`
               : `${payload.documents}件の公式IR資料を取得しました。`,
           );
         }
@@ -1253,9 +1323,10 @@ async function refreshCompany({ force = false, notify = false } = {}) {
     const lastSyncedAt = await loadCachedCompanyData(companyCode, config);
     let payload = null;
     if (!hasRegisteredSourceData(companyCode)) {
-      payload = await loadOfficialIrDocuments(companyCode);
+      payload = await loadOfficialIrDocuments(companyCode, config, { extract: force });
     } else if (force || isOlderThanThreeMonths(lastSyncedAt)) {
       payload = await invokeSync(companyCode, config);
+      await loadOfficialIrDocuments(companyCode, config, { extract: true });
     } else {
       addSyncLog("success", "鮮度確認", "前回取得から3か月未満のため、DBのデータを使用します。", companyCode);
     }
@@ -1272,6 +1343,10 @@ async function refreshCompany({ force = false, notify = false } = {}) {
           ? payload.officialIr
             ? payload.irDiscoveryFailed
               ? "公式IR資料を取得できませんでした。"
+              : payload.irExtractionFailed
+              ? "解析対象の決算PDFが見つかりませんでした。"
+              : payload.extracted
+              ? `決算PDFを解析しました。信頼度 ${Math.round(payload.confidence * 100)}%。`
               : `${payload.documents}件の公式IR資料を取得しました。`
             : payload.unsupported
             ? "この会社は企業マスタと株価のみ登録済みです。"

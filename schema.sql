@@ -142,3 +142,42 @@ create policy "Earn annual profit flows can be updated"
   with check (true);
 
 grant insert, update on public.earn_annual_profit_flows to anon, authenticated;
+
+create table if not exists public.earn_ir_document_extractions (
+  id text primary key,
+  company_code text not null references public.earn_companies(code),
+  source_url text not null,
+  document_name text not null,
+  markdown_text text not null,
+  extracted_data jsonb not null,
+  confidence numeric not null default 0,
+  reviewed boolean not null default false,
+  synced_at timestamptz not null default now(),
+  unique (company_code, source_url)
+);
+
+alter table public.earn_ir_document_extractions enable row level security;
+
+drop policy if exists "Earn IR document extractions are public" on public.earn_ir_document_extractions;
+create policy "Earn IR document extractions are public"
+  on public.earn_ir_document_extractions
+  for select
+  to anon, authenticated
+  using (true);
+
+drop policy if exists "Earn IR document extractions can be inserted" on public.earn_ir_document_extractions;
+create policy "Earn IR document extractions can be inserted"
+  on public.earn_ir_document_extractions
+  for insert
+  to anon, authenticated
+  with check (true);
+
+drop policy if exists "Earn IR document extractions can be updated" on public.earn_ir_document_extractions;
+create policy "Earn IR document extractions can be updated"
+  on public.earn_ir_document_extractions
+  for update
+  to anon, authenticated
+  using (true)
+  with check (true);
+
+grant insert, update on public.earn_ir_document_extractions to anon, authenticated;
