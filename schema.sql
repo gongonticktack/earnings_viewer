@@ -15,7 +15,7 @@ values
   ('toyota', 'トヨタ自動車', '7203', 'https://global.toyota/jp/ir/financial-results/'),
   ('ntt', 'NTT', '9432', 'https://group.ntt/jp/ir/library/presentation/financial/'),
   ('softbank', 'ソフトバンク', '9434', 'https://www.softbank.jp/corp/ir/documents/financial_reports/'),
-  ('softbank-group', 'ソフトバンクグループ', '9984', 'https://group.softbank/en/ir/financials'),
+  ('softbank-group', 'ソフトバンクグループ', '9984', 'https://group.softbank/ir/financials/financial_reports'),
   ('mufg', '三菱UFJフィナンシャル・グループ', '8306', 'https://www.mufg.jp/ir/index.html'),
   ('fast-retailing', 'ファーストリテイリング', '9983', 'https://www.fastretailing.com/jp/ir/'),
   ('hitachi', '日立製作所', '6501', 'https://www.hitachi.com/ja-jp/ir/library/fr/'),
@@ -52,13 +52,19 @@ create table if not exists public.earn_quarterly_results (
   quarter integer not null check (quarter between 1 and 4),
   period_end date not null,
   revenue bigint not null,
-  operating_cost bigint not null,
-  operating_income bigint not null,
+  operating_cost bigint,
+  operating_income bigint,
+  pretax_income bigint,
   net_income bigint not null,
   source_url text not null,
   synced_at timestamptz not null default now(),
   unique (company_code, fiscal_year, quarter)
 );
+
+alter table public.earn_quarterly_results
+  alter column operating_cost drop not null,
+  alter column operating_income drop not null,
+  add column if not exists pretax_income bigint;
 
 alter table public.earn_quarterly_results enable row level security;
 

@@ -19,7 +19,7 @@ const irSources = {
     ],
   },
   "softbank-group": {
-    sourcePage: "https://group.softbank/ir/financials",
+    sourcePage: "https://group.softbank/ir/financials/financial_reports",
     allowedDomains: ["group.softbank"],
   },
   mufg: {
@@ -164,9 +164,10 @@ const financialExtractionSchema = {
       properties: {
         revenue: { type: ["integer", "null"] },
         operatingIncome: { type: ["integer", "null"] },
+        pretaxIncome: { type: ["integer", "null"] },
         netIncome: { type: ["integer", "null"] },
       },
-      required: ["revenue", "operatingIncome", "netIncome"],
+      required: ["revenue", "operatingIncome", "pretaxIncome", "netIncome"],
     },
     evidence: { type: "array", items: { type: "string" } },
     confidence: { type: "number" },
@@ -232,6 +233,7 @@ async function extractOfficialIrDocument(request, env, companyCode) {
     "Return values in millions of Japanese yen as integers. Convert units when needed.",
     "Use cumulative year-to-date values when the document is quarterly or half-year.",
     "Use null when a requested metric is not explicitly disclosed.",
+    "For pretaxIncome, use consolidated profit before tax when available.",
     "For netIncome, use profit attributable to owners of parent when available.",
     "Evidence must contain short source excerpts supporting the extracted values.",
     "Do not guess. Lower confidence when labels or units are ambiguous.",

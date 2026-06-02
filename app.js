@@ -26,7 +26,7 @@ const companies = {
     code: "softbank-group",
     name: "SOFTBANK GROUP CORP.",
     sourceName: "SOFTBANK GROUP IR",
-    sourcePage: "https://group.softbank/en/ir/financials",
+    sourcePage: "https://group.softbank/ir/financials/financial_reports",
     stockSymbol: "9984.T",
   },
   mufg: {
@@ -329,6 +329,12 @@ const elements = {
   latestUpdate: document.querySelector("#latest-update"),
   syncButton: document.querySelector("#sync-button"),
   syncButtonLabel: document.querySelector("#sync-button-label"),
+  metricCostCaption: document.querySelector("#metric-cost-caption"),
+  metricProfitTitle: document.querySelector("#metric-profit-title"),
+  metricProfitCaption: document.querySelector("#metric-profit-caption"),
+  profitChartLabel: document.querySelector("#profit-chart-label"),
+  marginChartTitle: document.querySelector("#margin-chart-title"),
+  documentsProfitLabel: document.querySelector("#documents-profit-label"),
   documentsBody: document.querySelector("#documents-body"),
   toast: document.querySelector("#toast"),
   marginValue: document.querySelector("#margin-value"),
@@ -425,8 +431,19 @@ function renderPicker() {
   elements.quarterSelect.disabled = !state.results.length;
 }
 
+function profitValue(result) {
+  return state.companyCode === "softbank-group" ? result.pretaxIncome : result.operatingIncome;
+}
+
 function renderMetrics() {
   const current = activeResult();
+  const usesPretaxIncome = state.companyCode === "softbank-group";
+  elements.metricCostCaption.textContent = usesPretaxIncome ? "連結サマリーでは非開示" : "営業収益 − 営業利益";
+  elements.metricProfitTitle.textContent = usesPretaxIncome ? "Profit Before Tax" : "Operating Income";
+  elements.metricProfitCaption.textContent = usesPretaxIncome ? "税引前利益" : "営業利益";
+  elements.profitChartLabel.textContent = usesPretaxIncome ? "Profit Before Tax" : "Operating Income";
+  elements.marginChartTitle.textContent = usesPretaxIncome ? "Pretax Margin" : "Operating Margin";
+  elements.documentsProfitLabel.textContent = usesPretaxIncome ? "Profit Before Tax" : "Operating Income";
   if (!current) {
     elements.periodCaption.textContent = "決算データ未登録";
     metricIds.forEach((metric) => {
@@ -442,12 +459,12 @@ function renderMetrics() {
   elements.periodCaption.textContent = `決算期間終了日 ${formatDate(current.periodEnd)}`;
 
   metricIds.forEach((metric) => {
-    const key = metricKey[metric];
+    const key = metric === "operating" && usesPretaxIncome ? "pretaxIncome" : metricKey[metric];
     const valueElement = document.querySelector(`#metric-${metric}`);
     const changeElement = document.querySelector(`#change-${metric}`);
-    valueElement.textContent = formatBillions(current[key]);
+    valueElement.textContent = current[key] === null ? "開示なし" : formatBillions(current[key]);
 
-    if (!previous) {
+    if (!previous || current[key] === null || previous[key] === null || previous[key] === 0) {
       changeElement.textContent = "BASE";
       changeElement.classList.remove("negative");
       return;
@@ -458,8 +475,9 @@ function renderMetrics() {
     changeElement.classList.toggle("negative", change < 0);
   });
 
-  const margin = (current.operatingIncome / current.revenue) * 100;
-  const previousMargin = previous ? (previous.operatingIncome / previous.revenue) * 100 : margin;
+  const profitKey = usesPretaxIncome ? "pretaxIncome" : "operatingIncome";
+  const margin = (current[profitKey] / current.revenue) * 100;
+  const previousMargin = previous ? (previous[profitKey] / previous.revenue) * 100 : margin;
   const pointChange = margin - previousMargin;
   elements.marginValue.textContent = `${margin.toFixed(1)}%`;
   elements.marginChange.textContent = `${pointChange >= 0 ? "+" : ""}${pointChange.toFixed(1)} pt QoQ`;
@@ -498,7 +516,7 @@ function renderDocuments() {
           <td>${formatDate(result.periodEnd)}</td>
           <td>${quarterLabel(result)}</td>
           <td>${formatMillions(result.revenue)}</td>
-          <td>${formatMillions(result.operatingIncome)}</td>
+          <td>${formatMillions(profitValue(result))}</td>
           <td>${formatMillions(result.netIncome)}</td>
           <td><a class="pdf-link" href="${result.sourceUrl}" target="_blank" rel="noreferrer">PDF ↗</a></td>
         </tr>
@@ -537,7 +555,7 @@ function drawPerformanceChart() {
   const chartWidth = width - padding.left - padding.right;
   const chartHeight = height - padding.top - padding.bottom;
   const maxRevenue = Math.max(...state.results.map((item) => item.revenue)) * 1.12;
-  const maxProfit = Math.max(...state.results.map((item) => item.operatingIncome)) * 1.28;
+  const maxProfit = Math.max(...state.results.map(profitValue)) * 1.28;
   const gap = chartWidth / state.results.length;
   const barWidth = Math.min(47, gap * 0.38);
 
@@ -571,7 +589,7 @@ function drawPerformanceChart() {
     ctx.textAlign = "center";
     ctx.fillText(chartQuarterLabel(result), x, height - 7);
 
-    const profitY = padding.top + chartHeight - (result.operatingIncome / maxProfit) * chartHeight;
+    const profitY = padding.top + chartHeight - (profitValue(result) / maxProfit) * chartHeight;
     points.push({ x, y: profitY });
   });
 
@@ -605,7 +623,7 @@ function drawMarginChart() {
   const padding = { top: 12, right: 10, bottom: 29, left: 10 };
   const chartWidth = width - padding.left - padding.right;
   const chartHeight = height - padding.top - padding.bottom;
-  const margins = state.results.map((item) => (item.operatingIncome / item.revenue) * 100);
+  const margins = state.results.map((item) => (profitValue(item) / item.revenue) * 100);
   const max = Math.max(...margins) * 1.14;
   const points = margins.map((margin, index) => ({
     x: padding.left + (chartWidth / (margins.length - 1)) * index,
@@ -1140,6 +1158,111 @@ async function saveIrDocumentExtraction(companyCode, payload, config) {
   );
 }
 
+function softbankGroupQuarterlyDocuments(documents) {
+  const reports = documents
+    .map((document) => ({
+      ...document,
+      match: document.url.match(/financial-report_q([1-4])fy(\d{4})_\d+_ja\.pdf/i),
+    }))
+    .filter((document) => document.match);
+  if (!reports.length) return [];
+
+  const latestFiscalYear = Math.max(...reports.map((document) => Number(document.match[2])));
+  return reports
+    .filter((document) => Number(document.match[2]) === latestFiscalYear)
+    .map((document) => {
+      const quarter = Number(document.match[1]);
+      const fiscalYear = latestFiscalYear + 1;
+      const periodEnd = quarter === 4
+        ? `${fiscalYear}-03-31`
+        : `${fiscalYear - 1}-${["", "06-30", "09-30", "12-31"][quarter]}`;
+      return { ...document, quarter, fiscalYear, periodEnd };
+    })
+    .sort((left, right) => left.quarter - right.quarter);
+}
+
+function standaloneValue(current, previous, key) {
+  const value = current.cumulative[key];
+  const previousValue = previous?.cumulative[key] ?? 0;
+  return value === null || previousValue === null ? null : value - previousValue;
+}
+
+async function saveQuarterlyResults(results, companyCode, config) {
+  await fetchJsonWithSyncLog(
+    `${config.supabaseUrl}/rest/v1/earn_quarterly_results?on_conflict=company_code,fiscal_year,quarter`,
+    {
+      method: "POST",
+      headers: restWriteHeaders(config),
+      body: JSON.stringify(results.map((item) => serializeResult(companyCode, item))),
+    },
+    { companyCode, stage: "四半期データ保存", description: `${results.length}件の四半期データ` },
+  );
+}
+
+async function syncSoftbankGroupQuarterlyResults(documents, config) {
+  const reports = softbankGroupQuarterlyDocuments(documents);
+  if (!reports.length) {
+    addSyncLog("error", "決算PDF選定 失敗", "最新年度の四半期決算短信が見つかりませんでした。", "softbank-group");
+    return { documents: documents.length, officialIr: true, irExtractionFailed: true };
+  }
+
+  const extractions = [];
+  for (const report of reports) {
+    addSyncLog("info", `Q${report.quarter} 決算PDF解析 開始`, report.title, "softbank-group");
+    const payload = await fetchJson("/api/ir/softbank-group/extract", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url: report.url }),
+    });
+    await saveIrDocumentExtraction("softbank-group", payload, config);
+    if (
+      payload.extraction.confidence < 0.7
+      || !Number.isInteger(payload.extraction.cumulative.revenue)
+      || !Number.isInteger(payload.extraction.cumulative.pretaxIncome)
+      || !Number.isInteger(payload.extraction.cumulative.netIncome)
+    ) {
+      throw new Error(`Q${report.quarter}の必須項目をPDFから抽出できませんでした。`);
+    }
+    extractions.push({ ...report, extraction: payload.extraction });
+  }
+
+  const results = extractions.map((report, index) => {
+    const previous = extractions[index - 1]?.extraction;
+    return {
+      id: `softbank-group-fy${report.fiscalYear}-q${report.quarter}`,
+      fiscalYear: report.fiscalYear,
+      quarter: report.quarter,
+      periodEnd: report.periodEnd,
+      revenue: standaloneValue(report.extraction, previous, "revenue"),
+      operatingCost: null,
+      operatingIncome: null,
+      pretaxIncome: standaloneValue(report.extraction, previous, "pretaxIncome"),
+      netIncome: standaloneValue(report.extraction, previous, "netIncome"),
+      sourceUrl: report.url,
+    };
+  });
+  await saveQuarterlyResults(results, "softbank-group", config);
+  const syncedAt = new Date().toISOString();
+  await fetchJsonWithSyncLog(
+    `${config.supabaseUrl}/rest/v1/earn_companies?code=eq.softbank-group`,
+    {
+      method: "PATCH",
+      headers: restWriteHeaders(config),
+      body: JSON.stringify({ last_synced_at: syncedAt }),
+    },
+    { companyCode: "softbank-group", stage: "同期日時保存", description: "最終同期日時" },
+  );
+  state.resultsByCompany["softbank-group"] = results;
+  state.lastSyncedAtByCompany["softbank-group"] = syncedAt;
+  addSyncLog("success", "四半期データ反映 完了", `${results.length}件を単独四半期へ変換してDBへ保存しました。`, "softbank-group");
+  return {
+    documents: documents.length,
+    officialIr: true,
+    extracted: true,
+    confidence: Math.min(...extractions.map((item) => item.extraction.confidence)),
+  };
+}
+
 async function loadOfficialIrDocuments(companyCode, config, { extract = false } = {}) {
   addSyncLog("info", "公式IR資料取得 開始", "公式IRサイトへ最新資料を問い合わせています。", companyCode);
   try {
@@ -1152,6 +1275,9 @@ async function loadOfficialIrDocuments(companyCode, config, { extract = false } 
       companyCode,
     );
     if (!extract) return { documents: state.irDocumentsByCompany[companyCode].length, officialIr: true };
+    if (companyCode === "softbank-group") {
+      return await syncSoftbankGroupQuarterlyResults(state.irDocumentsByCompany[companyCode], config);
+    }
 
     const financialDocument = selectFinancialDocument(state.irDocumentsByCompany[companyCode]);
     if (!financialDocument) {
@@ -1207,6 +1333,7 @@ function serializeResult(companyCode, item) {
     revenue: item.revenue,
     operating_cost: item.operatingCost,
     operating_income: item.operatingIncome,
+    pretax_income: item.pretaxIncome,
     net_income: item.netIncome,
     source_url: item.sourceUrl,
   };
@@ -1373,8 +1500,9 @@ function normalizeResult(item) {
     quarter: item.quarter,
     periodEnd: item.period_end ?? item.periodEnd,
     revenue: item.revenue,
-    operatingCost: item.operating_cost ?? item.operatingCost,
-    operatingIncome: item.operating_income ?? item.operatingIncome,
+    operatingCost: item.operating_cost ?? item.operatingCost ?? null,
+    operatingIncome: item.operating_income ?? item.operatingIncome ?? null,
+    pretaxIncome: item.pretax_income ?? item.pretaxIncome ?? null,
     netIncome: item.net_income ?? item.netIncome,
     sourceUrl: item.source_url ?? item.sourceUrl,
   };
