@@ -12,6 +12,36 @@ const edinetCompanies = {
 
 const edinetDocumentTypes = new Set(["120", "130", "140", "150", "160", "170"]);
 const edinetBaseUrl = "https://api.edinet-fsa.go.jp/api/v2";
+const irSources = {
+  toyota: {
+    sourcePage: "https://global.toyota/jp/ir/financial-results/",
+    allowedDomains: ["global.toyota"],
+  },
+  ntt: {
+    sourcePage: "https://group.ntt/jp/ir/library/presentation/financial/",
+    allowedDomains: ["group.ntt", "ntt.jp"],
+  },
+  "softbank-group": {
+    sourcePage: "https://group.softbank/ir/financials/financial_reports",
+    allowedDomains: ["group.softbank"],
+  },
+  mufg: {
+    sourcePage: "https://www.mufg.jp/ir/index.html",
+    allowedDomains: ["mufg.jp"],
+  },
+  "fast-retailing": {
+    sourcePage: "https://www.fastretailing.com/jp/ir/library/earning.html",
+    allowedDomains: ["fastretailing.com"],
+  },
+  hitachi: {
+    sourcePage: "https://www.hitachi.com/ja-jp/ir/library/fr/",
+    allowedDomains: ["hitachi.com"],
+  },
+  smfg: {
+    sourcePage: "https://www.smfg.co.jp/investor/financial/latest_statement.html",
+    allowedDomains: ["smfg.co.jp"],
+  },
+};
 
 function jsonError(error, status = 500) {
   return Response.json({ error }, { status });
@@ -76,7 +106,6 @@ function serializeEdinetDocument(document, companyCode) {
     period_start: document.periodStart || null,
     period_end: document.periodEnd || null,
     submitted_at: document.submitDateTime,
-    pdf_url: `/api/edinet/documents/${document.docID}/pdf`,
     synced_at: new Date().toISOString(),
   };
 }
@@ -132,23 +161,73 @@ async function fetchCompanyEdinetDocuments(request, env, companyCode) {
   return Response.json({ companyCode, date, documents });
 }
 
-async function fetchEdinetPdf(env, docId) {
-  if (!env.EDINET_API_KEY) return jsonError("EDINET_API_KEY is not configured", 503);
-  if (!/^S[0-9A-Z]+$/.test(docId)) return jsonError("Document ID is invalid", 400);
+function decodeHtml(value) {
+  return value
+    .replaceAll("&amp;", "&")
+    .replaceAll("&quot;", '"')
+    .replaceAll("&#39;", "'")
+    .replaceAll("&lt;", "<")
+    .replaceAll("&gt;", ">")
+    .replaceAll("&nbsp;", " ");
+}
 
-  const upstream = await fetch(edinetUrl(`/documents/${docId}`, env.EDINET_API_KEY, { type: "2" }), {
+function textContent(value) {
+  return decodeHtml(value.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim());
+}
+
+function isAllowedDomain(hostname, domains) {
+  return domains.some((domain) => hostname === domain || hostname.endsWith(`.${domain}`));
+}
+
+function isFinancialDocumentTitle(value) {
+  return /決算|四半期|financial|earnings|quarter|results|report|presentation|summary/i.test(value);
+}
+
+function discoverOfficialIrPdfs(html, source) {
+  const documents = [];
+  const seen = new Set();
+  const linkPattern = /<a\b[^>]*\bhref\s*=\s*(["'])(.*?)\1[^>]*>([\s\S]*?)<\/a>/gi;
+
+  for (const match of html.matchAll(linkPattern)) {
+    let url;
+    try {
+      url = new URL(decodeHtml(match[2]), source.sourcePage);
+    } catch {
+      continue;
+    }
+    if (
+      url.protocol !== "https:"
+      || !isAllowedDomain(url.hostname, source.allowedDomains)
+      || !url.pathname.toLowerCase().endsWith(".pdf")
+      || seen.has(url.href)
+    ) continue;
+
+    seen.add(url.href);
+    const fallbackTitle = decodeURIComponent(url.pathname.split("/").at(-1));
+    documents.push({
+      title: textContent(match[3]) || fallbackTitle,
+      url: url.href,
+    });
+  }
+
+  const financialDocuments = documents.filter((document) => isFinancialDocumentTitle(`${document.title} ${document.url}`));
+  return (financialDocuments.length ? financialDocuments : documents).slice(0, 30);
+}
+
+async function fetchOfficialIrDocuments(companyCode) {
+  const source = irSources[companyCode];
+  if (!source) return jsonError("IR source is not configured", 404);
+
+  const upstream = await fetch(source.sourcePage, {
     headers: { "User-Agent": "earnings-viewer/1.0" },
+    cf: { cacheTtl: 3600, cacheEverything: true },
   });
-  if (!upstream.ok) return jsonError("EDINET PDF is temporarily unavailable", 502);
-  const contentType = upstream.headers.get("Content-Type") ?? "";
-  if (!contentType.toLowerCase().includes("pdf")) return jsonError("EDINET did not return a PDF", 502);
+  if (!upstream.ok) return jsonError("Official IR page is temporarily unavailable", 502);
 
-  return new Response(upstream.body, {
-    headers: {
-      "Cache-Control": "private, max-age=3600",
-      "Content-Disposition": `inline; filename="${docId}.pdf"`,
-      "Content-Type": "application/pdf",
-    },
+  return Response.json({
+    companyCode,
+    sourcePage: source.sourcePage,
+    documents: discoverOfficialIrPdfs(await upstream.text(), source),
   });
 }
 
@@ -174,11 +253,11 @@ export default {
       const url = new URL(request.url);
       if (url.pathname === "/api/edinet/sync" && request.method === "POST") return syncEdinetDocuments(request, env);
 
-      const pdfMatch = url.pathname.match(/^\/api\/edinet\/documents\/(S[0-9A-Z]+)\/pdf$/);
-      if (pdfMatch && request.method === "GET") return fetchEdinetPdf(env, pdfMatch[1]);
-
       const edinetMatch = url.pathname.match(/^\/api\/edinet\/([a-z-]+)$/);
       if (edinetMatch && request.method === "GET") return fetchCompanyEdinetDocuments(request, env, edinetMatch[1]);
+
+      const irMatch = url.pathname.match(/^\/api\/ir\/([a-z-]+)$/);
+      if (irMatch && request.method === "GET") return fetchOfficialIrDocuments(irMatch[1]);
 
       const stockMatch = url.pathname.match(/^\/api\/stocks\/([A-Z0-9.]+)$/);
       if (stockMatch && request.method === "GET") return fetchStock(stockMatch[1]);

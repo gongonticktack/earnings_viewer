@@ -307,6 +307,7 @@ const state = {
   companyCode: "toyota",
   resultsByCompany: { ...fallbackResults },
   edinetDocumentsByCompany: {},
+  officialIrDocumentsByCompany: {},
   results: fallbackResults.toyota,
   activeId: fallbackResults.toyota.at(-1).id,
   lastSyncedAtByCompany: {},
@@ -476,45 +477,44 @@ function renderMetrics() {
 }
 
 function renderDocuments() {
-  const documents = state.edinetDocumentsByCompany[state.companyCode];
+  const documents = state.officialIrDocumentsByCompany[state.companyCode];
   if (!documents) {
-    elements.documentsBody.innerHTML = '<tr><td colspan="4">EDINET書類を読み込んでいます。</td></tr>';
+    elements.documentsBody.innerHTML = '<tr><td colspan="4">公式IR資料を読み込んでいます。</td></tr>';
     return;
   }
   if (!documents.length) {
-    elements.documentsBody.innerHTML = '<tr><td colspan="4">保存済みのEDINET書類はありません。</td></tr>';
+    elements.documentsBody.innerHTML = '<tr><td colspan="4">公式IRサイトでPDF資料を取得できませんでした。</td></tr>';
     return;
   }
   elements.documentsBody.innerHTML = documents
     .map(
       (document) => `
         <tr>
-          <td>${edinetFiscalYear(document)}</td>
-          <td>${edinetQuarter(document)}</td>
-          <td>${escapeHtml(document.description)}</td>
-          <td><a class="pdf-link" href="${escapeHtml(document.pdfUrl)}" target="_blank" rel="noreferrer">PDF ↗</a></td>
+          <td>${officialDocumentFiscalYear(document)}</td>
+          <td>${officialDocumentQuarter(document)}</td>
+          <td>${escapeHtml(document.title)}</td>
+          <td><a class="pdf-link" href="${escapeHtml(document.url)}" target="_blank" rel="noreferrer">PDF ↗</a></td>
         </tr>
       `,
     )
     .join("");
 }
 
-function edinetFiscalYear(document) {
-  return document.periodEnd ? `FY${new Date(document.periodEnd).getUTCFullYear()}` : "—";
+function officialDocumentFiscalYear(document) {
+  const value = `${document.title} ${document.url}`;
+  const match = value.match(/\bfy\s*([12]\d{3}|[0-9]{2})\b/i)
+    ?? value.match(/(?:^|[^\d])([12]\d{3})(?:[^\d]|$)/);
+  if (!match) return "—";
+  const year = Number(match[1]);
+  return `FY${year < 100 ? 2000 + year : year}`;
 }
 
-function edinetQuarter(document) {
-  if (["120", "130"].includes(document.docTypeCode)) return "Full Year";
-  if (["160", "170"].includes(document.docTypeCode)) return "Q2";
-  if (!document.periodStart || !document.periodEnd) return "—";
-
-  const start = new Date(document.periodStart);
-  const end = new Date(document.periodEnd);
-  const months = (end.getUTCFullYear() - start.getUTCFullYear()) * 12
-    + end.getUTCMonth()
-    - start.getUTCMonth()
-    + 1;
-  return months >= 1 && months <= 12 ? `Q${Math.ceil(months / 3)}` : "—";
+function officialDocumentQuarter(document) {
+  const value = `${document.title} ${document.url}`;
+  const match = value.match(/q([1-4])/i)
+    ?? value.match(/([1-4])q/i)
+    ?? value.match(/第\s*([1-4])\s*四半期/);
+  return match ? `Q${match[1]}` : "—";
 }
 
 function prepareCanvas(canvas) {
@@ -1107,12 +1107,18 @@ async function loadCachedCompanyData(companyCode, config) {
   return state.lastSyncedAtByCompany[companyCode];
 }
 
-async function loadTodayEdinetDocuments(companyCode) {
-  addSyncLog("info", "EDINET照会 開始", "本日提出された書類を確認します。", companyCode);
-  const payload = await fetchJson(`/api/edinet/${companyCode}`);
-  state.edinetDocumentsByCompany[companyCode] = (payload.documents ?? []).map(normalizeEdinetDocument);
-  addSyncLog("success", "EDINET照会 完了", `${payload.documents?.length ?? 0}件の対象書類を読み込みました。`, companyCode);
-  return payload;
+async function loadOfficialIrDocuments(companyCode) {
+  addSyncLog("info", "公式IR資料取得 開始", "企業サイトからPDFリンクを確認します。", companyCode);
+  try {
+    const payload = await fetchJson(`/api/ir/${companyCode}`);
+    state.officialIrDocumentsByCompany[companyCode] = payload.documents ?? [];
+    addSyncLog("success", "公式IR資料取得 完了", `${payload.documents?.length ?? 0}件のPDFリンクを読み込みました。`, companyCode);
+    return payload;
+  } catch (error) {
+    state.officialIrDocumentsByCompany[companyCode] = [];
+    addSyncLog("error", "公式IR資料取得 失敗", error.message, companyCode);
+    return { documents: [] };
+  }
 }
 
 async function syncTodayEdinetDocuments(companyCode, config) {
@@ -1131,13 +1137,16 @@ async function refreshCompany({ force = false, notify = false } = {}) {
 
   try {
     if (!config.supabaseUrl || !config.supabaseAnonKey) {
-      const payload = await loadTodayEdinetDocuments(companyCode);
+      const payload = await loadOfficialIrDocuments(companyCode);
       if (state.companyCode === companyCode) render();
-      if (notify) showToast(`${payload.documents?.length ?? 0}件の本日提出EDINET書類を取得しました。`);
+      if (notify) showToast(`${payload.documents?.length ?? 0}件の公式IR PDFを取得しました。`);
       return;
     }
 
-    await loadCachedCompanyData(companyCode, config);
+    await Promise.all([
+      loadCachedCompanyData(companyCode, config),
+      loadOfficialIrDocuments(companyCode),
+    ]);
     const payload = force ? await syncTodayEdinetDocuments(companyCode, config) : null;
 
     if (state.companyCode === companyCode) {
@@ -1185,7 +1194,6 @@ function normalizeEdinetDocument(item) {
     periodStart: item.period_start ?? item.periodStart,
     periodEnd: item.period_end ?? item.periodEnd,
     submittedAt: item.submitted_at ?? item.submittedAt,
-    pdfUrl: item.pdf_url ?? item.pdfUrl,
   };
 }
 

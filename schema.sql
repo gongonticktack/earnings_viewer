@@ -161,9 +161,11 @@ create table if not exists public.earn_edinet_documents (
   period_start date,
   period_end date,
   submitted_at timestamptz not null,
-  pdf_url text not null,
   synced_at timestamptz not null default now()
 );
+
+alter table public.earn_edinet_documents
+  drop column if exists pdf_url;
 
 alter table public.earn_edinet_documents enable row level security;
 
