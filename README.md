@@ -34,7 +34,7 @@ python -m http.server 5173
 
 1. Supabase プロジェクトを作成します。
 2. SQL Editor で直下の `schema.sql` を実行します。
-3. `supabase-config.json` に接続情報を設定します。
+3. `config.json` にブラウザ表示用の Supabase URL、anon key、公開APIルートを設定します。
 
 既存環境でも、項目追加後は `schema.sql` を再実行してください。`alter table ... add column if not exists` で不足列だけを追加します。
 
@@ -44,7 +44,7 @@ python -m http.server 5173
 
 ## Cloudflare Worker 設定
 
-EDINET API キーを Worker Secret に登録します。日次CronでEDINET書類をDBへ保存する場合は、Supabase の接続情報も登録します。
+EDINET API キーは `config.json` の `edinet.apiKey` に設定します。Worker Secret の `EDINET_API_KEY` が登録されている場合は、そちらを優先します。日次CronでEDINET書類をDBへ保存する場合は、Supabase の接続情報も登録します。
 
 ```powershell
 npx wrangler secret put EDINET_API_KEY
@@ -54,6 +54,8 @@ npx wrangler secret put SUPABASE_SERVICE_ROLE_KEY
 
 EDINET API キーは [EDINET API利用登録](https://api.edinet-fsa.go.jp/api/auth/index.aspx?mode=1) から発行します。
 
+`config.json` はブラウザへ配信される公開設定です。EDINET API キーも閲覧可能になります。Supabase service role key は格納せず、Worker Secret に登録してください。
+
 ## 更新タイミング
 
 Cloudflare Cron Trigger が毎日 00:15 JST に当日分のEDINET書類一覧を取得します。対象企業の有価証券報告書、半期報告書、旧四半期報告書と各訂正報告書を `earn_edinet_documents` へ保存します。
@@ -62,6 +64,12 @@ Cloudflare Cron Trigger が毎日 00:15 JST に当日分のEDINET書類一覧を
 
 ```powershell
 curl.exe -X POST "https://<worker-domain>/api/edinet/sync?date=2026-06-01"
+```
+
+書類一覧 API は日付単位で取得します。初回バックフィルでは、次のように終了日と日数を指定して最大31日ずつ取り込んでください。
+
+```powershell
+curl.exe -X POST "https://<worker-domain>/api/edinet/sync?date=2026-06-01&days=31"
 ```
 
 画面下部の `Sync Log` には、DB読込とEDINET同期の結果が残ります。

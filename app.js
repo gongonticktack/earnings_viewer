@@ -910,7 +910,7 @@ async function renderStockChart() {
   elements.stockChartStatus.textContent = `${symbol} の週足を読み込んでいます。`;
 
   try {
-    const payload = await fetchJson(`/api/stocks/${symbol}`);
+    const payload = await fetchJson(`${window.APP_CONFIG.api.stocks}/${encodeURIComponent(symbol)}`);
     const result = payload.chart?.result?.[0];
     const timestamps = result?.timestamp ?? [];
     const quotes = result?.indicators?.quote?.[0] ?? {};
@@ -1124,7 +1124,7 @@ async function loadCachedCompanyData(companyCode, config) {
 async function loadOfficialIrDocuments(companyCode) {
   addSyncLog("info", "公式IR資料取得 開始", "企業サイトからPDFリンクを確認します。", companyCode);
   try {
-    const payload = await fetchJson(`/api/ir/${companyCode}`);
+    const payload = await fetchJson(`${window.APP_CONFIG.api.officialIr}/${encodeURIComponent(companyCode)}`);
     state.officialIrDocumentsByCompany[companyCode] = payload.documents ?? [];
     addSyncLog("success", "公式IR資料取得 完了", `${payload.documents?.length ?? 0}件のPDFリンクを読み込みました。`, companyCode);
     return payload;
@@ -1136,9 +1136,9 @@ async function loadOfficialIrDocuments(companyCode) {
 }
 
 async function syncTodayEdinetDocuments(companyCode, config) {
-  addSyncLog("info", "EDINET同期 開始", "金融庁EDINET APIから本日提出された対象企業の書類を取得し、DBへ保存します。", companyCode);
+  addSyncLog("info", "EDINET同期 開始", "金融庁EDINET APIから直近31日分の対象企業の書類を取得し、DBへ保存します。", companyCode);
   try {
-    const payload = await fetchJson("/api/edinet/sync", { method: "POST" });
+    const payload = await fetchJson(`${window.APP_CONFIG.api.edinetSync}?days=31`, { method: "POST" });
     if (payload.edinetError) {
       addSyncLog("error", "EDINET同期 失敗", payload.edinetError, companyCode);
       return { ...payload, edinetSyncFailed: true };

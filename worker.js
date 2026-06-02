@@ -1,3 +1,5 @@
+import config from "./config.json";
+
 const stockSymbols = new Set(["7203.T", "9432.T", "9434.T", "9984.T", "8306.T", "9983.T", "6501.T", "8316.T"]);
 
 const edinetCompanies = {
@@ -11,6 +13,8 @@ const edinetCompanies = {
 };
 
 const edinetDocumentTypes = new Set(["120", "130", "140", "150", "160", "170"]);
+const edinetLegalStatuses = new Set(["1", "2"]);
+const maxEdinetSyncDays = 31;
 const edinetApiBaseUrl = "https://api.edinet-fsa.go.jp/api/v2";
 const irSources = {
   toyota: {
@@ -74,7 +78,28 @@ function jstDate() {
 }
 
 function isDate(value) {
-  return /^\d{4}-\d{2}-\d{2}$/.test(value ?? "");
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value ?? "")) return false;
+  const date = new Date(`${value}T00:00:00Z`);
+  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
+}
+
+function dateRangeEndingAt(endDate, days) {
+  const date = new Date(`${endDate}T00:00:00Z`);
+  return Array.from({ length: days }, (_value, index) => {
+    const item = new Date(date);
+    item.setUTCDate(item.getUTCDate() - index);
+    return item.toISOString().slice(0, 10);
+  }).reverse();
+}
+
+function requestedEdinetDates(url) {
+  const endDate = url.searchParams.get("date") ?? jstDate();
+  const days = Number(url.searchParams.get("days") ?? "1");
+  if (!isDate(endDate)) throw new Error("date must be YYYY-MM-DD");
+  if (!Number.isInteger(days) || days < 1 || days > maxEdinetSyncDays) {
+    throw new Error(`days must be an integer between 1 and ${maxEdinetSyncDays}`);
+  }
+  return dateRangeEndingAt(endDate, days);
 }
 
 function edinetUrl(path, apiKey, params = {}) {
@@ -85,8 +110,11 @@ function edinetUrl(path, apiKey, params = {}) {
 }
 
 async function fetchEdinetDocumentList(env, date) {
-  if (!env.EDINET_API_KEY) throw new Error("EDINET_API_KEY is not configured");
-  const response = await fetch(edinetUrl("/documents.json", env.EDINET_API_KEY, { date, type: "2" }), {
+  const apiKey = env.EDINET_API_KEY ?? config.edinet?.apiKey;
+  if (!apiKey) {
+    throw new Error("EDINET API key is not configured. Set edinet.apiKey in config.json or register EDINET_API_KEY as a Cloudflare Worker secret.");
+  }
+  const response = await fetch(edinetUrl("/documents.json", apiKey, { date, type: "2" }), {
     headers: { "User-Agent": "earnings-viewer/1.0" },
   });
   const text = await response.text();
@@ -112,9 +140,9 @@ function companyCodeFor(document) {
 
 function isFinancialDocument(document) {
   return edinetDocumentTypes.has(String(document.docTypeCode))
-    && document.pdfFlag === "1"
-    && document.withdrawalStatus !== "1"
-    && document.disclosureStatus !== "1";
+    && document.withdrawalStatus === "0"
+    && document.disclosureStatus === "0"
+    && edinetLegalStatuses.has(String(document.legalStatus));
 }
 
 function serializeEdinetDocument(document, companyCode) {
@@ -134,13 +162,14 @@ function serializeEdinetDocument(document, companyCode) {
 }
 
 function filterEdinetDocuments(documents, requestedCompanyCode = null) {
-  return documents
+  const filtered = documents
     .filter(isFinancialDocument)
     .map((document) => {
       const companyCode = companyCodeFor(document);
       return companyCode ? serializeEdinetDocument(document, companyCode) : null;
     })
     .filter((document) => document && (!requestedCompanyCode || document.company_code === requestedCompanyCode));
+  return [...new Map(filtered.map((document) => [document.id, document])).values()];
 }
 
 async function saveEdinetDocuments(env, documents) {
@@ -170,15 +199,21 @@ async function syncEdinetDocuments(request, env) {
     return jsonError("Unauthorized", 401);
   }
   const url = new URL(request.url);
-  const date = url.searchParams.get("date") ?? jstDate();
-  if (!isDate(date)) return jsonError("date must be YYYY-MM-DD", 400);
+  let dates;
+  try {
+    dates = requestedEdinetDates(url);
+  } catch (error) {
+    return jsonError(error, 400);
+  }
 
   let documents;
   try {
-    documents = filterEdinetDocuments(await fetchEdinetDocumentList(env, date));
+    const documentLists = [];
+    for (const date of dates) documentLists.push(...await fetchEdinetDocumentList(env, date));
+    documents = filterEdinetDocuments(documentLists);
   } catch (error) {
     return Response.json({
-      date,
+      dates,
       saved: 0,
       persisted: false,
       edinetError: error instanceof Error ? error.message : String(error),
@@ -192,7 +227,7 @@ async function syncEdinetDocuments(request, env) {
   } catch (error) {
     persistenceError = error instanceof Error ? error.message : String(error);
   }
-  return Response.json({ date, saved: persisted ? documents.length : 0, persisted, persistenceError, documents });
+  return Response.json({ dates, saved: persisted ? documents.length : 0, persisted, persistenceError, documents });
 }
 
 async function fetchCompanyEdinetDocuments(request, env, companyCode) {
@@ -309,7 +344,10 @@ export default {
   async fetch(request, env) {
     try {
       const url = new URL(request.url);
-      if (url.pathname === "/api/edinet/sync" && request.method === "POST") return syncEdinetDocuments(request, env);
+      if (url.pathname === "/api/edinet/sync") {
+        if (request.method !== "POST") return jsonError("Method not allowed. Use POST for EDINET sync.", 405);
+        return syncEdinetDocuments(request, env);
+      }
 
       const edinetMatch = url.pathname.match(/^\/api\/edinet\/([a-z-]+)$/);
       if (edinetMatch && request.method === "GET") return fetchCompanyEdinetDocuments(request, env, edinetMatch[1]);
