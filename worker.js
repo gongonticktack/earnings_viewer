@@ -1,307 +1,197 @@
 const stockSymbols = new Set(["7203.T", "9432.T", "9434.T", "9984.T", "8306.T", "9983.T", "6501.T", "8316.T"]);
-const irSources = {
-  toyota: {
-    sourcePage: "https://global.toyota/jp/ir/financial-results/",
-    allowedDomains: ["global.toyota"],
-  },
-  ntt: {
-    sourcePage: "https://group.ntt/jp/ir/library/presentation/financial/",
-    allowedDomains: ["group.ntt", "ntt.jp"],
-  },
-  softbank: {
-    sourcePage: "https://www.softbank.jp/corp/ir/documents/financial_reports/",
-    allowedDomains: ["softbank.jp"],
-    supplementalPages: [
-      "https://www.softbank.jp/corp/set/common/shared/json/ir/fy2025/fy2025_q4.tsv",
-      "https://www.softbank.jp/corp/set/common/shared/json/ir/fy2025/fy2025_q3.tsv",
-      "https://www.softbank.jp/corp/set/common/shared/json/ir/fy2025/fy2025_q2.tsv",
-      "https://www.softbank.jp/corp/set/common/shared/json/ir/fy2025/fy2025_q1.tsv",
-    ],
-  },
-  "softbank-group": {
-    sourcePage: "https://group.softbank/ir/financials/financial_reports",
-    allowedDomains: ["group.softbank"],
-  },
-  mufg: {
-    sourcePage: "https://www.mufg.jp/ir/index.html",
-    allowedDomains: ["mufg.jp"],
-  },
-  "fast-retailing": {
-    sourcePage: "https://www.fastretailing.com/jp/ir/library/earning.html",
-    allowedDomains: ["fastretailing.com"],
-  },
-  hitachi: {
-    sourcePage: "https://www.hitachi.com/ja-jp/ir/library/fr/",
-    allowedDomains: ["hitachi.com"],
-  },
-  smfg: {
-    sourcePage: "https://www.smfg.co.jp/investor/financial/latest_statement.html",
-    allowedDomains: ["smfg.co.jp"],
-  },
+
+const edinetCompanies = {
+  toyota: "7203",
+  ntt: "9432",
+  "softbank-group": "9984",
+  mufg: "8306",
+  "fast-retailing": "9983",
+  hitachi: "6501",
+  smfg: "8316",
 };
 
-function decodeHtml(value) {
-  return value
-    .replaceAll("&amp;", "&")
-    .replaceAll("&quot;", '"')
-    .replaceAll("&#39;", "'")
-    .replaceAll("&lt;", "<")
-    .replaceAll("&gt;", ">")
-    .replaceAll("&nbsp;", " ");
+const edinetDocumentTypes = new Set(["120", "130", "140", "150", "160", "170"]);
+const edinetBaseUrl = "https://api.edinet-fsa.go.jp/api/v2";
+
+function jsonError(error, status = 500) {
+  return Response.json({ error }, { status });
 }
 
-function isQuarterlyReportTitle(text) {
-  return /決算短信|決算報告|四半期報告|四半期決算|quarterly report|quarterly results|earnings results|financial results|financial report/i.test(
-    text,
-  );
+function jstDate() {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Tokyo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date());
+  const value = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return `${value.year}-${value.month}-${value.day}`;
 }
 
-function filterQuarterlyDocuments(documents) {
-  const filtered = documents.filter(
-    (document) =>
-      document.type === "PDF"
-      && (isQuarterlyReportTitle(document.title) || isQuarterlyReportTitle(document.url)),
-  );
-  return filtered.length ? filtered : documents;
+function isDate(value) {
+  return /^\d{4}-\d{2}-\d{2}$/.test(value ?? "");
 }
 
-function textContent(value) {
-  return decodeHtml(value.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim());
+function edinetUrl(path, apiKey, params = {}) {
+  const url = new URL(`${edinetBaseUrl}${path}`);
+  url.searchParams.set("Subscription-Key", apiKey);
+  for (const [key, value] of Object.entries(params)) url.searchParams.set(key, value);
+  return url;
 }
 
-function isAllowedDomain(hostname, domains) {
-  return domains.some((domain) => hostname === domain || hostname.endsWith(`.${domain}`));
-}
-
-function discoverIrDocuments(html, source) {
-  const documents = [];
-  const seen = new Set();
-  const linkPattern = /<a\b[^>]*\bhref\s*=\s*(["'])(.*?)\1[^>]*>([\s\S]*?)<\/a>/gi;
-
-  for (const match of html.matchAll(linkPattern)) {
-    const href = decodeHtml(match[2]);
-    let url;
-    try {
-      url = new URL(href, source.sourcePage);
-    } catch {
-      continue;
-    }
-    if (url.protocol !== "https:" || !isAllowedDomain(url.hostname, source.allowedDomains)) continue;
-
-    const extension = url.pathname.match(/\.(pdf|xlsx?|csv)$/i)?.[1]?.toLowerCase();
-    if (!extension || seen.has(url.href)) continue;
-
-    seen.add(url.href);
-    const fallbackTitle = decodeURIComponent(url.pathname.split("/").at(-1));
-    documents.push({
-      title: textContent(match[3]) || fallbackTitle,
-      type: extension === "pdf" ? "PDF" : extension.toUpperCase(),
-      url: url.href,
-    });
+async function fetchEdinetDocumentList(env, date) {
+  if (!env.EDINET_API_KEY) throw new Error("EDINET_API_KEY is not configured");
+  const response = await fetch(edinetUrl("/documents.json", env.EDINET_API_KEY, { date, type: "2" }), {
+    headers: { "User-Agent": "earnings-viewer/1.0" },
+  });
+  if (!response.ok) throw new Error(`EDINET document list request failed (${response.status})`);
+  const payload = await response.json();
+  if (payload.metadata?.status && payload.metadata.status !== "200") {
+    throw new Error(payload.metadata.message ?? "EDINET returned an error");
   }
-
-  return documents.slice(0, 30);
+  return payload.results ?? [];
 }
 
-function discoverLooseIrDocuments(text, source) {
-  const documents = [];
-  const seen = new Set();
-  const filePattern = /(?:https?:\/\/|\/)[^"'<>\s\t]+?\.(?:pdf|xlsx?|csv)(?:\?[^"'<>\s\t]*)?/gi;
+function companyCodeFor(document) {
+  const secCode = String(document.secCode ?? "");
+  return Object.entries(edinetCompanies).find(([, stockCode]) => secCode.startsWith(stockCode))?.[0] ?? null;
+}
 
-  for (const match of text.matchAll(filePattern)) {
-    let url;
-    try {
-      url = new URL(decodeHtml(match[0]), source.sourcePage);
-    } catch {
-      continue;
-    }
-    if (!isAllowedDocumentUrl(url, source) || seen.has(url.href)) continue;
+function isFinancialDocument(document) {
+  return edinetDocumentTypes.has(String(document.docTypeCode))
+    && document.pdfFlag === "1"
+    && document.withdrawalStatus !== "1"
+    && document.disclosureStatus !== "1";
+}
 
-    seen.add(url.href);
-    const extension = url.pathname.match(/\.(pdf|xlsx?|csv)$/i)[1].toLowerCase();
-    documents.push({
-      title: decodeURIComponent(url.pathname.split("/").at(-1)),
-      type: extension === "pdf" ? "PDF" : extension.toUpperCase(),
-      url: url.href,
-    });
+function serializeEdinetDocument(document, companyCode) {
+  return {
+    id: document.docID,
+    company_code: companyCode,
+    edinet_code: document.edinetCode,
+    sec_code: document.secCode,
+    filer_name: document.filerName,
+    doc_type_code: document.docTypeCode,
+    description: document.docDescription,
+    period_start: document.periodStart || null,
+    period_end: document.periodEnd || null,
+    submitted_at: document.submitDateTime,
+    pdf_url: `/api/edinet/documents/${document.docID}/pdf`,
+    synced_at: new Date().toISOString(),
+  };
+}
+
+function filterEdinetDocuments(documents, requestedCompanyCode = null) {
+  return documents
+    .filter(isFinancialDocument)
+    .map((document) => {
+      const companyCode = companyCodeFor(document);
+      return companyCode ? serializeEdinetDocument(document, companyCode) : null;
+    })
+    .filter((document) => document && (!requestedCompanyCode || document.company_code === requestedCompanyCode));
+}
+
+async function saveEdinetDocuments(env, documents) {
+  if (!documents.length) return;
+  if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY) {
+    throw new Error("SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY is not configured");
   }
-
-  return documents;
+  const response = await fetch(`${env.SUPABASE_URL}/rest/v1/earn_edinet_documents?on_conflict=id`, {
+    method: "POST",
+    headers: {
+      apikey: env.SUPABASE_SERVICE_ROLE_KEY,
+      Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+      "Content-Type": "application/json",
+      Prefer: "resolution=merge-duplicates,return=minimal",
+    },
+    body: JSON.stringify(documents),
+  });
+  if (!response.ok) throw new Error(`Supabase EDINET document save failed (${response.status})`);
 }
 
-function isAllowedDocumentUrl(url, source) {
-  return url.protocol === "https:"
-    && isAllowedDomain(url.hostname, source.allowedDomains)
-    && /\.(pdf|xlsx?|csv)$/i.test(url.pathname);
+async function syncEdinetDocuments(request, env) {
+  if (env.SYNC_TOKEN && request.headers.get("Authorization") !== `Bearer ${env.SYNC_TOKEN}`) {
+    return jsonError("Unauthorized", 401);
+  }
+  const url = new URL(request.url);
+  const date = url.searchParams.get("date") ?? jstDate();
+  if (!isDate(date)) return jsonError("date must be YYYY-MM-DD", 400);
+
+  const documents = filterEdinetDocuments(await fetchEdinetDocumentList(env, date));
+  await saveEdinetDocuments(env, documents);
+  return Response.json({ date, saved: documents.length, documents });
 }
 
-async function fetchOfficialIrDocuments(companyCode) {
-  const source = irSources[companyCode];
-  if (!source) return Response.json({ error: "IR source is not configured" }, { status: 404 });
+async function fetchCompanyEdinetDocuments(request, env, companyCode) {
+  if (!edinetCompanies[companyCode]) return jsonError("Company is not configured", 404);
+  const url = new URL(request.url);
+  const date = url.searchParams.get("date") ?? jstDate();
+  if (!isDate(date)) return jsonError("date must be YYYY-MM-DD", 400);
 
-  const upstream = await fetch(source.sourcePage, {
+  const documents = filterEdinetDocuments(await fetchEdinetDocumentList(env, date), companyCode);
+  return Response.json({ companyCode, date, documents });
+}
+
+async function fetchEdinetPdf(env, docId) {
+  if (!env.EDINET_API_KEY) return jsonError("EDINET_API_KEY is not configured", 503);
+  if (!/^S[0-9A-Z]+$/.test(docId)) return jsonError("Document ID is invalid", 400);
+
+  const upstream = await fetch(edinetUrl(`/documents/${docId}`, env.EDINET_API_KEY, { type: "2" }), {
+    headers: { "User-Agent": "earnings-viewer/1.0" },
+  });
+  if (!upstream.ok) return jsonError("EDINET PDF is temporarily unavailable", 502);
+  const contentType = upstream.headers.get("Content-Type") ?? "";
+  if (!contentType.toLowerCase().includes("pdf")) return jsonError("EDINET did not return a PDF", 502);
+
+  return new Response(upstream.body, {
+    headers: {
+      "Cache-Control": "private, max-age=3600",
+      "Content-Disposition": `inline; filename="${docId}.pdf"`,
+      "Content-Type": "application/pdf",
+    },
+  });
+}
+
+async function fetchStock(symbol) {
+  if (!stockSymbols.has(symbol)) return new Response("Unsupported stock symbol", { status: 400 });
+  const upstreamUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?range=2y&interval=1wk`;
+  const upstream = await fetch(upstreamUrl, {
     headers: { "User-Agent": "earnings-viewer/1.0" },
     cf: { cacheTtl: 3600, cacheEverything: true },
   });
-  if (!upstream.ok) return Response.json({ error: "Official IR page is temporarily unavailable" }, { status: 502 });
-
-  const html = await upstream.text();
-  const documents = discoverIrDocuments(html, source);
-  for (const supplementalPage of source.supplementalPages ?? []) {
-    const supplemental = await fetch(supplementalPage, {
-      headers: { "User-Agent": "earnings-viewer/1.0" },
-      cf: { cacheTtl: 3600, cacheEverything: true },
-    });
-    if (!supplemental.ok) continue;
-    documents.push(...discoverLooseIrDocuments(await supplemental.text(), source));
-  }
-  const uniqueDocuments = [...new Map(documents.map((document) => [document.url, document])).values()].slice(0, 30);
-  const documentsToReturn = filterQuarterlyDocuments(uniqueDocuments);
-  return Response.json(
-    {
-      companyCode,
-      sourcePage: source.sourcePage,
-      documents: documentsToReturn,
+  if (!upstream.ok) return new Response("Stock price data is temporarily unavailable", { status: 502 });
+  return new Response(upstream.body, {
+    headers: {
+      "Cache-Control": "public, max-age=3600",
+      "Content-Type": "application/json; charset=utf-8",
     },
-    { headers: { "Cache-Control": "public, max-age=3600" } },
-  );
-}
-
-const financialExtractionSchema = {
-  type: "object",
-  properties: {
-    documentType: { type: "string" },
-    fiscalYear: { type: ["integer", "null"] },
-    quarter: { type: ["integer", "null"] },
-    periodEnd: { type: ["string", "null"] },
-    unit: { type: "string" },
-    cumulative: {
-      type: "object",
-      properties: {
-        revenue: { type: ["integer", "null"] },
-        operatingIncome: { type: ["integer", "null"] },
-        pretaxIncome: { type: ["integer", "null"] },
-        netIncome: { type: ["integer", "null"] },
-      },
-      required: ["revenue", "operatingIncome", "pretaxIncome", "netIncome"],
-    },
-    evidence: { type: "array", items: { type: "string" } },
-    confidence: { type: "number" },
-    notes: { type: "array", items: { type: "string" } },
-  },
-  required: ["documentType", "fiscalYear", "quarter", "periodEnd", "unit", "cumulative", "evidence", "confidence", "notes"],
-};
-
-function normalizeExtractedFinancials(value) {
-  const normalized = {
-    ...value,
-    fiscalYear: Number.isInteger(value.fiscalYear) ? value.fiscalYear : null,
-    quarter: Number.isInteger(value.quarter) && value.quarter >= 1 && value.quarter <= 4 ? value.quarter : null,
-    periodEnd: /^\d{4}-\d{2}-\d{2}$/.test(value.periodEnd ?? "") ? value.periodEnd : null,
-    confidence: Math.max(0, Math.min(1, Number(value.confidence) || 0)),
-  };
-  normalized.cumulative = Object.fromEntries(
-    Object.entries(value.cumulative ?? {}).map(([key, item]) => [key, Number.isInteger(item) ? item : null]),
-  );
-  return normalized;
-}
-
-async function extractOfficialIrDocument(request, env, companyCode) {
-  if (!env.AI) return Response.json({ error: "Workers AI binding is not configured" }, { status: 503 });
-
-  const source = irSources[companyCode];
-  if (!source) return Response.json({ error: "IR source is not configured" }, { status: 404 });
-
-  const body = await request.json().catch(() => ({}));
-  let documentUrl;
-  try {
-    documentUrl = new URL(body.url);
-  } catch {
-    return Response.json({ error: "Document URL is invalid" }, { status: 400 });
-  }
-  if (!isAllowedDocumentUrl(documentUrl, source)) {
-    return Response.json({ error: "Document URL is not allowed" }, { status: 400 });
-  }
-
-  const upstream = await fetch(documentUrl, { headers: { "User-Agent": "earnings-viewer/1.0" } });
-  if (!upstream.ok) return Response.json({ error: "Official IR document is temporarily unavailable" }, { status: 502 });
-  const contentLength = Number(upstream.headers.get("Content-Length")) || 0;
-  if (contentLength > 15 * 1024 * 1024) {
-    return Response.json({ error: "Official IR document is too large to parse safely" }, { status: 413 });
-  }
-
-  const documentBuffer = await upstream.arrayBuffer();
-  if (documentBuffer.byteLength > 15 * 1024 * 1024) {
-    return Response.json({ error: "Official IR document is too large to parse safely" }, { status: 413 });
-  }
-  const name = decodeURIComponent(documentUrl.pathname.split("/").at(-1));
-  const converted = await env.AI.toMarkdown({
-    name,
-    blob: new Blob([documentBuffer], { type: upstream.headers.get("Content-Type") ?? "application/pdf" }),
-  });
-  if (converted.format !== "markdown") {
-    return Response.json({ error: converted.error ?? "Document text conversion failed" }, { status: 422 });
-  }
-
-  const markdown = converted.data;
-  const prompt = [
-    "Extract consolidated financial results from this official investor-relations document.",
-    "Return values in millions of Japanese yen as integers. Convert units when needed.",
-    "Use cumulative year-to-date values when the document is quarterly or half-year.",
-    "Use null when a requested metric is not explicitly disclosed.",
-    "For pretaxIncome, use consolidated profit before tax when available.",
-    "For netIncome, use profit attributable to owners of parent when available.",
-    "Evidence must contain short source excerpts supporting the extracted values.",
-    "Do not guess. Lower confidence when labels or units are ambiguous.",
-    "",
-    markdown.slice(0, 30000),
-  ].join("\n");
-  const extraction = await env.AI.run("@cf/meta/llama-3.1-8b-instruct-fast", {
-    messages: [{ role: "user", content: prompt }],
-    response_format: { type: "json_schema", json_schema: financialExtractionSchema },
-    temperature: 0,
-    max_tokens: 1600,
-  });
-
-  return Response.json({
-    companyCode,
-    sourceUrl: documentUrl.href,
-    name,
-    markdown: markdown.slice(0, 250000),
-    markdownTruncated: markdown.length > 250000,
-    extraction: normalizeExtractedFinancials(extraction.response ?? extraction),
   });
 }
 
 export default {
   async fetch(request, env) {
-    const url = new URL(request.url);
-    const extractionMatch = url.pathname.match(/^\/api\/ir\/([a-z-]+)\/extract$/);
-    if (extractionMatch && request.method === "POST") return extractOfficialIrDocument(request, env, extractionMatch[1]);
+    try {
+      const url = new URL(request.url);
+      if (url.pathname === "/api/edinet/sync" && request.method === "POST") return syncEdinetDocuments(request, env);
 
-    const irMatch = url.pathname.match(/^\/api\/ir\/([a-z-]+)$/);
-    if (irMatch) return fetchOfficialIrDocuments(irMatch[1]);
+      const pdfMatch = url.pathname.match(/^\/api\/edinet\/documents\/(S[0-9A-Z]+)\/pdf$/);
+      if (pdfMatch && request.method === "GET") return fetchEdinetPdf(env, pdfMatch[1]);
 
-    const match = url.pathname.match(/^\/api\/stocks\/([A-Z0-9.]+)$/);
+      const edinetMatch = url.pathname.match(/^\/api\/edinet\/([a-z-]+)$/);
+      if (edinetMatch && request.method === "GET") return fetchCompanyEdinetDocuments(request, env, edinetMatch[1]);
 
-    if (!match) return new Response("Not found", { status: 404 });
+      const stockMatch = url.pathname.match(/^\/api\/stocks\/([A-Z0-9.]+)$/);
+      if (stockMatch && request.method === "GET") return fetchStock(stockMatch[1]);
 
-    const symbol = match[1];
-    if (!stockSymbols.has(symbol)) return new Response("Unsupported stock symbol", { status: 400 });
+      return new Response("Not found", { status: 404 });
+    } catch (error) {
+      return jsonError(error.message);
+    }
+  },
 
-    const upstreamUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?range=2y&interval=1wk`;
-    const upstream = await fetch(upstreamUrl, {
-      headers: { "User-Agent": "earnings-viewer/1.0" },
-      cf: { cacheTtl: 3600, cacheEverything: true },
-    });
-
-    if (!upstream.ok) return new Response("Stock price data is temporarily unavailable", { status: 502 });
-
-    return new Response(upstream.body, {
-      headers: {
-        "Cache-Control": "public, max-age=3600",
-        "Content-Type": "application/json; charset=utf-8",
-      },
-    });
+  async scheduled(_controller, env) {
+    const date = jstDate();
+    const documents = filterEdinetDocuments(await fetchEdinetDocumentList(env, date));
+    await saveEdinetDocuments(env, documents);
   },
 };

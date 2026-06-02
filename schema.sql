@@ -148,41 +148,31 @@ create policy "Earn annual profit flows can be updated"
 
 grant insert, update on public.earn_annual_profit_flows to anon, authenticated;
 
-create table if not exists public.earn_ir_document_extractions (
+drop table if exists public.earn_ir_document_extractions;
+
+create table if not exists public.earn_edinet_documents (
   id text primary key,
   company_code text not null references public.earn_companies(code),
-  source_url text not null,
-  document_name text not null,
-  markdown_text text not null,
-  extracted_data jsonb not null,
-  confidence numeric not null default 0,
-  reviewed boolean not null default false,
-  synced_at timestamptz not null default now(),
-  unique (company_code, source_url)
+  edinet_code text not null,
+  sec_code text,
+  filer_name text not null,
+  doc_type_code text not null,
+  description text not null,
+  period_start date,
+  period_end date,
+  submitted_at timestamptz not null,
+  pdf_url text not null,
+  synced_at timestamptz not null default now()
 );
 
-alter table public.earn_ir_document_extractions enable row level security;
+alter table public.earn_edinet_documents enable row level security;
 
-drop policy if exists "Earn IR document extractions are public" on public.earn_ir_document_extractions;
-create policy "Earn IR document extractions are public"
-  on public.earn_ir_document_extractions
+drop policy if exists "Earn EDINET documents are public" on public.earn_edinet_documents;
+create policy "Earn EDINET documents are public"
+  on public.earn_edinet_documents
   for select
   to anon, authenticated
   using (true);
 
-drop policy if exists "Earn IR document extractions can be inserted" on public.earn_ir_document_extractions;
-create policy "Earn IR document extractions can be inserted"
-  on public.earn_ir_document_extractions
-  for insert
-  to anon, authenticated
-  with check (true);
-
-drop policy if exists "Earn IR document extractions can be updated" on public.earn_ir_document_extractions;
-create policy "Earn IR document extractions can be updated"
-  on public.earn_ir_document_extractions
-  for update
-  to anon, authenticated
-  using (true)
-  with check (true);
-
-grant insert, update on public.earn_ir_document_extractions to anon, authenticated;
+create index if not exists earn_edinet_documents_company_submitted_idx
+  on public.earn_edinet_documents (company_code, submitted_at desc);

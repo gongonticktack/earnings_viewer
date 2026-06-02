@@ -14,13 +14,13 @@
 - 日立製作所
 - 三井住友フィナンシャルグループ
 
-トヨタ自動車、NTT、ソフトバンクグループは直近2年度分の四半期データを表示します。公式IRサイトから最新の四半期決算報告書だけを取得し、決算PDFの解析候補をDBへ保存できます。
+トヨタ自動車、NTT、ソフトバンクグループは直近2年度分の四半期データを表示します。提出書類の一覧とPDFリンクは EDINET API から取得してDBへ保存します。
 
 ## ローカル表示
 
 静的ファイルだけでデモ表示できます。`index.html` をブラウザで直接開いてください。
 
-株価チャートは `/api/stocks/:symbol`、公式IR資料一覧は `/api/ir/:companyCode`、決算PDF解析は `/api/ir/:companyCode/extract` を使うため、ローカルで `index.html` を直接開いた場合は表示されません。Cloudflare Workers へ配信した環境で有効になります。
+株価チャートは `/api/stocks/:symbol`、EDINET提出書類一覧は `/api/edinet/:companyCode`、PDF表示は `/api/edinet/documents/:docId/pdf` を使うため、ローカルで `index.html` を直接開いた場合は表示されません。Cloudflare Workers へ配信した環境で有効になります。
 
 ローカルサーバーを使う場合は、Python がインストールされていれば次のコマンドでも表示できます。
 
@@ -40,17 +40,31 @@ python -m http.server 5173
 
 テーブル名は他アプリとの同居を考慮して `earn_` 接頭辞で統一しています。以前の接頭辞なしテーブルは `schema.sql` 実行時に削除されません。
 
-ブラウザから Supabase REST API を呼び出すため、匿名キーにこのアプリ用テーブルの追加・更新権限を付与しています。個人用・試作用の構成です。インターネットへ公開する場合は、認証を追加して書き込みポリシーを制限してください。
+ブラウザから Supabase REST API を呼び出して表示用データを読み込みます。EDINET書類の追加・更新は Cloudflare Worker から service role key を使って行います。
+
+## Cloudflare Worker 設定
+
+EDINET API キーと Supabase の接続情報を Worker Secret に登録します。
+
+```powershell
+npx wrangler secret put EDINET_API_KEY
+npx wrangler secret put SUPABASE_URL
+npx wrangler secret put SUPABASE_SERVICE_ROLE_KEY
+```
+
+EDINET API キーは [EDINET API利用登録](https://api.edinet-fsa.go.jp/api/auth/index.aspx?mode=1) から発行します。
 
 ## 更新タイミング
 
-定期実行ジョブは使用しません。ページを開いたときと会社を切り替えたときに、選択中の会社だけを確認します。
+Cloudflare Cron Trigger が毎日 00:15 JST に当日分のEDINET書類一覧を取得します。対象企業の有価証券報告書、半期報告書、旧四半期報告書と各訂正報告書を `earn_edinet_documents` へ保存します。
 
-- 前回取得から3か月未満: DBに保存済みのデータを表示します。
-- 前回取得から3か月以上、または初回取得: JSに同梱済みのデータをDBへ保存してから表示します。
-- `今すぐ再取得`: 3か月の経過を待たず、表示中の会社だけをDBへ再保存します。
+画面の `EDINETを同期` を押すと、当日分を手動で再取得します。過去日を取り込む場合は、配信済みWorkerに対して日付を指定します。
 
-画面下部の `Sync Log` には、DB読込、鮮度確認、DB保存の結果が残ります。失敗時はエラーになった段階とレスポンス内容を確認できます。
+```powershell
+curl.exe -X POST "https://<worker-domain>/api/edinet/sync?date=2026-06-01"
+```
+
+画面下部の `Sync Log` には、DB読込とEDINET同期の結果が残ります。
 
 ## データの扱い
 
@@ -61,7 +75,7 @@ python -m http.server 5173
 - 営業コストは `営業収益 - 営業利益` の算出値です。
 - キャッシュフロー欄には、前期末現金から今期末現金までの増減をウォーターフォールで表示します。売上収益、原価・人件費などの費用、投資活動、財務活動を順に反映し、税金、非現金項目、運転資本の増減、為替影響などをその他調整として表示します。
 - 株価欄には、Cloudflare Worker 経由で無料の株価JSONから読み込んだ、表示中の企業の週足ローソクチャートを表示します。
-- 全8社について、Cloudflare Worker 経由で公式IRサイトから最新資料のリンクを取得します。Workers AI の `toMarkdown()` で決算PDF本文を抽出し、AIで構造化した候補値を根拠文・信頼度とともに `earn_ir_document_extractions` へ保存します。
-- PDF解析結果は `reviewed = false` で保存します。四半期累計から単独四半期への変換と企業別の項目確認が済んだ値だけを画面用テーブルへ反映してください。MUFG と三井住友FGは銀行業のため、銀行向け指標の追加が必要です。
-
-現在はトヨタ FY2025〜FY2026、NTT FY2024〜FY2025、ソフトバンクグループは最新年度の四半期決算短信を対象とする予定です。ブラウザから公式IRページを直接取得するとCORS制限を受けるため、新しい決算発表を完全自動で解析して追加する場合はサーバー側の処理が必要です。
+- EDINET API のAPIキーはブラウザへ渡しません。PDFリンクは Worker のプロキシを経由します。
+- PDF本文の解析と Workers AI は使用しません。
+- 現在のチャート数値は既存の登録済みデータです。今回追加したEDINET同期は提出書類メタデータとPDFリンクを扱います。
+- 四半期報告書制度は2024年4月1日以後に廃止されたため、Q1・Q3の決算短信をEDINETだけで補完することはできません。

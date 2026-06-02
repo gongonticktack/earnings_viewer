@@ -6,14 +6,14 @@
   "observability": {
     "enabled": true
   },
-  "ai": {
-    "binding": "AI"
-  },
   "assets": {
     "directory": ".",
     "run_worker_first": ["/api/*"]
   },
   "compatibility_flags": [
     "nodejs_compat"
-  ]
+  ],
+  "triggers": {
+    "crons": ["15 15 * * *"]
+  }
 }

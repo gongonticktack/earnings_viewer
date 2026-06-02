@@ -306,7 +306,7 @@ const annualAnalyses = {
 const state = {
   companyCode: "toyota",
   resultsByCompany: { ...fallbackResults },
-  irDocumentsByCompany: {},
+  edinetDocumentsByCompany: {},
   results: fallbackResults.toyota,
   activeId: fallbackResults.toyota.at(-1).id,
   lastSyncedAtByCompany: {},
@@ -327,7 +327,6 @@ const elements = {
   metricProfitCaption: document.querySelector("#metric-profit-caption"),
   profitChartLabel: document.querySelector("#profit-chart-label"),
   marginChartTitle: document.querySelector("#margin-chart-title"),
-  documentsProfitLabel: document.querySelector("#documents-profit-label"),
   documentsBody: document.querySelector("#documents-body"),
   toast: document.querySelector("#toast"),
   marginValue: document.querySelector("#margin-value"),
@@ -436,7 +435,6 @@ function renderMetrics() {
   elements.metricProfitCaption.textContent = usesPretaxIncome ? "税引前利益" : "営業利益";
   elements.profitChartLabel.textContent = usesPretaxIncome ? "Profit Before Tax" : "Operating Income";
   elements.marginChartTitle.textContent = usesPretaxIncome ? "Pretax Margin" : "Operating Margin";
-  elements.documentsProfitLabel.textContent = usesPretaxIncome ? "Profit Before Tax" : "Operating Income";
   if (!current) {
     elements.periodCaption.textContent = "決算データ未登録";
     metricIds.forEach((metric) => {
@@ -478,40 +476,23 @@ function renderMetrics() {
 }
 
 function renderDocuments() {
-  if (!state.results.length) {
-    const documents = state.irDocumentsByCompany[state.companyCode];
-    if (!documents) {
-      elements.documentsBody.innerHTML = '<tr><td colspan="6">公式IR資料を読み込んでいます。</td></tr>';
-      return;
-    }
-    if (!documents.length) {
-      elements.documentsBody.innerHTML = '<tr><td colspan="6">公式IR資料を取得できませんでした。</td></tr>';
-      return;
-    }
-    elements.documentsBody.innerHTML = documents
-      .map(
-        (document) => `
-          <tr>
-            <td>公式IR</td>
-            <td colspan="4">${escapeHtml(document.title)}</td>
-            <td><a class="pdf-link" href="${escapeHtml(document.url)}" target="_blank" rel="noreferrer">${escapeHtml(document.type)} ↗</a></td>
-          </tr>
-        `,
-      )
-      .join("");
+  const documents = state.edinetDocumentsByCompany[state.companyCode];
+  if (!documents) {
+    elements.documentsBody.innerHTML = '<tr><td colspan="6">EDINET書類を読み込んでいます。</td></tr>';
     return;
   }
-  elements.documentsBody.innerHTML = [...state.results]
-    .reverse()
+  if (!documents.length) {
+    elements.documentsBody.innerHTML = '<tr><td colspan="6">保存済みのEDINET書類はありません。</td></tr>';
+    return;
+  }
+  elements.documentsBody.innerHTML = documents
     .map(
-      (result) => `
-        <tr class="${result.id === state.activeId ? "selected" : ""}">
-          <td>${formatDate(result.periodEnd)}</td>
-          <td>${quarterLabel(result)}</td>
-          <td>${formatMillions(result.revenue)}</td>
-          <td>${formatMillions(profitValue(result))}</td>
-          <td>${formatMillions(result.netIncome)}</td>
-          <td><a class="pdf-link" href="${result.sourceUrl}" target="_blank" rel="noreferrer">PDF ↗</a></td>
+      (document) => `
+        <tr>
+          <td>${formatDate(document.submittedAt)}</td>
+          <td>${escapeHtml(document.description)}</td>
+          <td colspan="3">${document.periodEnd ? `${formatDate(document.periodStart)} - ${formatDate(document.periodEnd)}` : "—"}</td>
+          <td><a class="pdf-link" href="${escapeHtml(document.pdfUrl)}" target="_blank" rel="noreferrer">PDF ↗</a></td>
         </tr>
       `,
     )
@@ -951,24 +932,10 @@ function showToast(message) {
   window.setTimeout(() => elements.toast.classList.remove("show"), 3300);
 }
 
-function isOlderThanThreeMonths(dateString) {
-  if (!dateString) return true;
-  const threshold = new Date();
-  threshold.setMonth(threshold.getMonth() - 3);
-  return new Date(dateString) < threshold;
-}
-
-function hasRegisteredSourceData(companyCode) {
-  return Boolean(fallbackResults[companyCode]?.length);
-}
-
 function updateSyncButtonAvailability({ loading = false } = {}) {
-  const isSupported = hasRegisteredSourceData(state.companyCode);
   elements.syncButton.disabled = loading;
-  elements.syncButton.title = isSupported
-    ? "JSへ登録済みの公式IRデータをDBへ再保存します。"
-    : "公式IRサイトから最新資料を取得し、決算PDFを解析します。";
-  elements.syncButtonLabel.textContent = isSupported ? "今すぐ再取得" : "IR資料を解析";
+  elements.syncButton.title = "本日提出されたEDINET書類を取得してDBへ保存します。";
+  elements.syncButtonLabel.textContent = "EDINETを同期";
 }
 
 function addSyncLog(level, stage, message, companyCode = state.companyCode) {
@@ -1080,7 +1047,7 @@ async function loadCachedCompanyData(companyCode, config) {
   addSyncLog("success", "DB読込開始", "保存済みデータと前回取得日時を確認します。", companyCode);
   const baseUrl = `${config.supabaseUrl}/rest/v1`;
   const headers = apiHeaders(config);
-  const [companiesData, resultsData, flowsData] = await Promise.all([
+  const [companiesData, resultsData, flowsData, documentsData] = await Promise.all([
     fetchJsonWithSyncLog(
       `${baseUrl}/earn_companies?code=eq.${companyCode}&select=last_synced_at`,
       { headers },
@@ -1096,6 +1063,11 @@ async function loadCachedCompanyData(companyCode, config) {
       { headers },
       { companyCode, stage: "年次CF読込", description: "保存済み年次キャッシュフロー" },
     ),
+    fetchJsonWithSyncLog(
+      `${baseUrl}/earn_edinet_documents?company_code=eq.${companyCode}&select=*&order=submitted_at.desc`,
+      { headers },
+      { companyCode, stage: "EDINET書類読込", description: "保存済みEDINET書類" },
+    ),
   ]);
 
   state.lastSyncedAtByCompany[companyCode] = companiesData[0]?.last_synced_at ?? null;
@@ -1104,6 +1076,7 @@ async function loadCachedCompanyData(companyCode, config) {
     ...annualAnalyses[companyCode],
     ...flowsData[0],
   });
+  state.edinetDocumentsByCompany[companyCode] = documentsData.map(normalizeEdinetDocument);
   addSyncLog(
     "success",
     "DB読込完了",
@@ -1116,306 +1089,20 @@ async function loadCachedCompanyData(companyCode, config) {
   return state.lastSyncedAtByCompany[companyCode];
 }
 
-function isQuarterlyReportTitle(text) {
-  return /決算短信|決算報告|四半期報告|四半期決算|quarterly report|quarterly results|earnings results|financial results|financial report/i.test(
-    text,
-  );
+async function loadTodayEdinetDocuments(companyCode) {
+  addSyncLog("info", "EDINET照会 開始", "本日提出された書類を確認します。", companyCode);
+  const payload = await fetchJson(`/api/edinet/${companyCode}`);
+  state.edinetDocumentsByCompany[companyCode] = (payload.documents ?? []).map(normalizeEdinetDocument);
+  addSyncLog("success", "EDINET照会 完了", `${payload.documents?.length ?? 0}件の対象書類を読み込みました。`, companyCode);
+  return payload;
 }
 
-function selectFinancialDocument(documents) {
-  const candidates = documents.filter(
-    (document) =>
-      document.type === "PDF"
-      && (isQuarterlyReportTitle(document.title) || isQuarterlyReportTitle(document.url)),
-  );
-  return candidates[0] ?? documents.find((document) => document.type === "PDF");
-}
-
-async function saveIrDocumentExtraction(companyCode, payload, config) {
-  if (!config.supabaseUrl || !config.supabaseAnonKey) return;
-  const idBuffer = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(payload.sourceUrl));
-  const id = `${companyCode}-${[...new Uint8Array(idBuffer)]
-    .slice(0, 12)
-    .map((item) => item.toString(16).padStart(2, "0"))
-    .join("")}`;
-  await fetchJsonWithSyncLog(
-    `${config.supabaseUrl}/rest/v1/earn_ir_document_extractions?on_conflict=company_code,source_url`,
-    {
-      method: "POST",
-      headers: restWriteHeaders(config),
-      body: JSON.stringify({
-        id,
-        company_code: companyCode,
-        source_url: payload.sourceUrl,
-        document_name: payload.name,
-        markdown_text: payload.markdown,
-        extracted_data: payload.extraction,
-        confidence: payload.extraction.confidence,
-        reviewed: false,
-      }),
-    },
-    { companyCode, stage: "PDF解析結果保存", description: "PDF本文と抽出候補" },
-  );
-}
-
-function softbankGroupQuarterlyDocuments(documents) {
-  const reports = documents
-    .map((document) => ({
-      ...document,
-      match: document.url.match(/financial-report_q([1-4])fy(\d{4})_\d+_ja\.pdf/i),
-    }))
-    .filter((document) => document.match);
-  if (!reports.length) return [];
-
-  const latestFiscalYear = Math.max(...reports.map((document) => Number(document.match[2])));
-  return reports
-    .filter((document) => Number(document.match[2]) === latestFiscalYear)
-    .map((document) => {
-      const quarter = Number(document.match[1]);
-      const fiscalYear = latestFiscalYear + 1;
-      const periodEnd = quarter === 4
-        ? `${fiscalYear}-03-31`
-        : `${fiscalYear - 1}-${["", "06-30", "09-30", "12-31"][quarter]}`;
-      return { ...document, quarter, fiscalYear, periodEnd };
-    })
-    .sort((left, right) => left.quarter - right.quarter);
-}
-
-function standaloneValue(current, previous, key) {
-  const value = current.cumulative[key];
-  const previousValue = previous?.cumulative[key] ?? 0;
-  return value === null || previousValue === null ? null : value - previousValue;
-}
-
-async function saveQuarterlyResults(results, companyCode, config) {
-  await fetchJsonWithSyncLog(
-    `${config.supabaseUrl}/rest/v1/earn_quarterly_results?on_conflict=company_code,fiscal_year,quarter`,
-    {
-      method: "POST",
-      headers: restWriteHeaders(config),
-      body: JSON.stringify(results.map((item) => serializeResult(companyCode, item))),
-    },
-    { companyCode, stage: "四半期データ保存", description: `${results.length}件の四半期データ` },
-  );
-}
-
-async function syncSoftbankGroupQuarterlyResults(documents, config) {
-  const reports = softbankGroupQuarterlyDocuments(documents);
-  if (!reports.length) {
-    addSyncLog("error", "決算PDF選定 失敗", "最新年度の四半期決算短信が見つかりませんでした。", "softbank-group");
-    return { documents: documents.length, officialIr: true, irExtractionFailed: true };
-  }
-
-  const extractions = [];
-  for (const report of reports) {
-    addSyncLog("info", `Q${report.quarter} 決算PDF解析 開始`, report.title, "softbank-group");
-    const payload = await fetchJson("/api/ir/softbank-group/extract", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ url: report.url }),
-    });
-    await saveIrDocumentExtraction("softbank-group", payload, config);
-    if (
-      payload.extraction.confidence < 0.7
-      || !Number.isInteger(payload.extraction.cumulative.revenue)
-      || !Number.isInteger(payload.extraction.cumulative.pretaxIncome)
-      || !Number.isInteger(payload.extraction.cumulative.netIncome)
-    ) {
-      throw new Error(`Q${report.quarter}の必須項目をPDFから抽出できませんでした。`);
-    }
-    extractions.push({ ...report, extraction: payload.extraction });
-  }
-
-  const results = extractions.map((report, index) => {
-    const previous = extractions[index - 1]?.extraction;
-    return {
-      id: `softbank-group-fy${report.fiscalYear}-q${report.quarter}`,
-      fiscalYear: report.fiscalYear,
-      quarter: report.quarter,
-      periodEnd: report.periodEnd,
-      revenue: standaloneValue(report.extraction, previous, "revenue"),
-      operatingCost: null,
-      operatingIncome: null,
-      pretaxIncome: standaloneValue(report.extraction, previous, "pretaxIncome"),
-      netIncome: standaloneValue(report.extraction, previous, "netIncome"),
-      sourceUrl: report.url,
-    };
-  });
-  await saveQuarterlyResults(results, "softbank-group", config);
-  const syncedAt = new Date().toISOString();
-  await fetchJsonWithSyncLog(
-    `${config.supabaseUrl}/rest/v1/earn_companies?code=eq.softbank-group`,
-    {
-      method: "PATCH",
-      headers: restWriteHeaders(config),
-      body: JSON.stringify({ last_synced_at: syncedAt }),
-    },
-    { companyCode: "softbank-group", stage: "同期日時保存", description: "最終同期日時" },
-  );
-  state.resultsByCompany["softbank-group"] = results;
-  state.lastSyncedAtByCompany["softbank-group"] = syncedAt;
-  addSyncLog("success", "四半期データ反映 完了", `${results.length}件を単独四半期へ変換してDBへ保存しました。`, "softbank-group");
-  return {
-    documents: documents.length,
-    officialIr: true,
-    extracted: true,
-    confidence: Math.min(...extractions.map((item) => item.extraction.confidence)),
-  };
-}
-
-async function loadOfficialIrDocuments(companyCode, config, { extract = false } = {}) {
-  addSyncLog("info", "公式IR資料取得 開始", "公式IRサイトへ最新資料を問い合わせています。", companyCode);
-  try {
-    const payload = await fetchJson(`/api/ir/${companyCode}`);
-    state.irDocumentsByCompany[companyCode] = payload.documents ?? [];
-    addSyncLog(
-      "success",
-      "公式IR資料取得 完了",
-      `${state.irDocumentsByCompany[companyCode].length}件の公式IR資料を読み込みました。`,
-      companyCode,
-    );
-    if (!extract) return { documents: state.irDocumentsByCompany[companyCode].length, officialIr: true };
-    if (companyCode === "softbank-group") {
-      return await syncSoftbankGroupQuarterlyResults(state.irDocumentsByCompany[companyCode], config);
-    }
-
-    const financialDocument = selectFinancialDocument(state.irDocumentsByCompany[companyCode]);
-    if (!financialDocument) {
-      addSyncLog("error", "決算PDF選定 失敗", "解析対象にできるPDFが公式IRページで見つかりませんでした。", companyCode);
-      return { documents: state.irDocumentsByCompany[companyCode].length, officialIr: true, irExtractionFailed: true };
-    }
-
-    addSyncLog("info", "決算PDF解析 開始", financialDocument.title, companyCode);
-    try {
-      const extraction = await fetchJson(`/api/ir/${companyCode}/extract`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url: financialDocument.url }),
-      });
-      await saveIrDocumentExtraction(companyCode, extraction, config);
-      addSyncLog(
-        "success",
-        "決算PDF解析 完了",
-        `抽出候補を保存しました。信頼度 ${Math.round(extraction.extraction.confidence * 100)}%。レビュー後に画面用データへ反映できます。`,
-        companyCode,
-      );
-      return {
-        documents: state.irDocumentsByCompany[companyCode].length,
-        officialIr: true,
-        extracted: true,
-        confidence: extraction.extraction.confidence,
-      };
-    } catch (error) {
-      addSyncLog("error", "決算PDF解析 失敗", error.message, companyCode);
-      return { documents: state.irDocumentsByCompany[companyCode].length, officialIr: true, irExtractionFailed: true };
-    }
-  } catch (error) {
-    state.irDocumentsByCompany[companyCode] = [];
-    addSyncLog("error", "公式IR資料取得 失敗", error.message, companyCode);
-    return { documents: 0, officialIr: true, irDiscoveryFailed: true };
-  }
-}
-
-function restWriteHeaders(config, { returnRepresentation = false } = {}) {
-  return {
-    ...apiHeaders(config),
-    Prefer: `resolution=merge-duplicates,return=${returnRepresentation ? "representation" : "minimal"}`,
-  };
-}
-
-function serializeResult(companyCode, item) {
-  return {
-    id: item.id,
-    company_code: companyCode,
-    fiscal_year: item.fiscalYear,
-    quarter: item.quarter,
-    period_end: item.periodEnd,
-    revenue: item.revenue,
-    operating_cost: item.operatingCost,
-    operating_income: item.operatingIncome,
-    pretax_income: item.pretaxIncome,
-    net_income: item.netIncome,
-    source_url: item.sourceUrl,
-  };
-}
-
-function serializeAnnualFlow(companyCode, item) {
-  return {
-    id: `${companyCode}-${item.currentFiscalYear.toLowerCase()}`,
-    company_code: companyCode,
-    previous_fiscal_year: item.previousFiscalYear,
-    current_fiscal_year: item.currentFiscalYear,
-    previous_revenue: item.previousRevenue,
-    current_revenue: item.currentRevenue,
-    previous_operating_cost: item.previousOperatingCost,
-    current_operating_cost: item.currentOperatingCost,
-    previous_operating_income: item.previousOperatingIncome,
-    current_operating_income: item.currentOperatingIncome,
-    operating_cash_flow: item.operatingCashFlow,
-    investing_cash_flow: item.investingCashFlow,
-    financing_cash_flow: item.financingCashFlow,
-    previous_cash_and_cash_equivalents: item.previousCashAndCashEquivalents,
-    cash_and_cash_equivalents: item.cashAndCashEquivalents,
-    expense_breakdown: item.expenses,
-    source_url: fallbackResults[companyCode].at(-1).sourceUrl,
-  };
-}
-
-async function invokeSync(companyCode, config) {
-  const baseUrl = `${config.supabaseUrl}/rest/v1`;
-  const syncedAt = new Date().toISOString();
-  const results = fallbackResults[companyCode].map((item) => serializeResult(companyCode, item));
-
-  if (!hasRegisteredSourceData(companyCode)) {
-    addSyncLog(
-      "unsupported",
-      "IR取込未対応",
-      "企業マスタと株価のみ登録済みです。決算データを取得するには、この会社向けの公式IR取込処理を追加する必要があります。",
-      companyCode,
-    );
-    return { synced: 0, unsupported: true, lastSyncedAt: state.lastSyncedAtByCompany[companyCode] ?? null };
-  }
-
-  const annualFlow = annualAnalyses[companyCode] ? serializeAnnualFlow(companyCode, annualAnalyses[companyCode]) : null;
-  addSyncLog("success", "データ種別", `${registeredDataDescription}: 四半期${results.length}件`, companyCode);
-  addSyncLog("success", "DB保存開始", "JSへ登録済みの決算データをDBへ保存します。", companyCode);
-
-  if (results.length) {
-    await fetchJsonWithSyncLog(
-      `${baseUrl}/earn_quarterly_results?on_conflict=company_code,fiscal_year,quarter`,
-      {
-        method: "POST",
-        headers: restWriteHeaders(config),
-        body: JSON.stringify(results),
-      },
-      { companyCode, stage: "四半期データ保存", description: `${results.length}件の四半期データ` },
-    );
-  }
-  if (annualFlow) {
-    await fetchJsonWithSyncLog(
-      `${baseUrl}/earn_annual_profit_flows?on_conflict=company_code,current_fiscal_year`,
-      {
-        method: "POST",
-        headers: restWriteHeaders(config),
-        body: JSON.stringify(annualFlow),
-      },
-      { companyCode, stage: "年次CF保存", description: "年次キャッシュフロー" },
-    );
-  }
-  await fetchJsonWithSyncLog(
-    `${baseUrl}/earn_companies?code=eq.${companyCode}`,
-    {
-      method: "PATCH",
-      headers: restWriteHeaders(config),
-      body: JSON.stringify({ last_synced_at: syncedAt }),
-    },
-    { companyCode, stage: "同期日時保存", description: "最終同期日時" },
-  );
-
-  state.resultsByCompany[companyCode] = fallbackResults[companyCode];
-  state.lastSyncedAtByCompany[companyCode] = syncedAt;
-  addSyncLog("success", "DB保存完了", `${results.length}件の四半期データを保存しました。`, companyCode);
-  return { synced: results.length, lastSyncedAt: syncedAt };
+async function syncTodayEdinetDocuments(companyCode, config) {
+  addSyncLog("info", "EDINET同期 開始", "本日提出された対象企業の書類をDBへ保存します。", companyCode);
+  const payload = await fetchJson("/api/edinet/sync", { method: "POST" });
+  addSyncLog("success", "EDINET同期 完了", `${payload.saved}件の書類をDBへ保存しました。`, companyCode);
+  await loadCachedCompanyData(companyCode, config);
+  return payload;
 }
 
 async function refreshCompany({ force = false, notify = false } = {}) {
@@ -1426,37 +1113,14 @@ async function refreshCompany({ force = false, notify = false } = {}) {
 
   try {
     if (!config.supabaseUrl || !config.supabaseAnonKey) {
-      if (!hasRegisteredSourceData(companyCode)) {
-        const payload = await loadOfficialIrDocuments(companyCode, config, { extract: force });
-        if (state.companyCode === companyCode) render();
-        if (notify) {
-          showToast(
-            payload.irDiscoveryFailed
-              ? "公式IR資料を取得できませんでした。"
-              : payload.irExtractionFailed
-              ? "決算PDFを解析できませんでした。"
-              : payload.extracted
-              ? `決算PDFを解析しました。信頼度 ${Math.round(payload.confidence * 100)}%。`
-              : `${payload.documents}件の公式IR資料を取得しました。`,
-          );
-        }
-        return;
-      }
-      addSyncLog("success", "デモモード", `Supabase未接続: ${registeredDataDescription}`, companyCode);
-      if (notify) showToast("デモモード: JSへ登録済みの決算データを表示しています。");
+      const payload = await loadTodayEdinetDocuments(companyCode);
+      if (state.companyCode === companyCode) render();
+      if (notify) showToast(`${payload.documents?.length ?? 0}件の本日提出EDINET書類を取得しました。`);
       return;
     }
 
-    const lastSyncedAt = await loadCachedCompanyData(companyCode, config);
-    let payload = null;
-    if (!hasRegisteredSourceData(companyCode)) {
-      payload = await loadOfficialIrDocuments(companyCode, config, { extract: force });
-    } else if (force || isOlderThanThreeMonths(lastSyncedAt)) {
-      payload = await invokeSync(companyCode, config);
-      await loadOfficialIrDocuments(companyCode, config, { extract: true });
-    } else {
-      addSyncLog("success", "鮮度確認", "前回取得から3か月未満のため、DBのデータを使用します。", companyCode);
-    }
+    await loadCachedCompanyData(companyCode, config);
+    const payload = force ? await syncTodayEdinetDocuments(companyCode, config) : null;
 
     if (state.companyCode === companyCode) {
       state.results = state.resultsByCompany[companyCode];
@@ -1465,23 +1129,7 @@ async function refreshCompany({ force = false, notify = false } = {}) {
       render();
     }
     if (notify || payload) {
-      showToast(
-        payload
-          ? payload.officialIr
-            ? payload.irDiscoveryFailed
-              ? "公式IR資料を取得できませんでした。"
-              : payload.irExtractionFailed
-              ? "解析対象の決算PDFが見つかりませんでした。"
-              : payload.extracted
-              ? `決算PDFを解析しました。信頼度 ${Math.round(payload.confidence * 100)}%。`
-              : `${payload.documents}件の公式IR資料を取得しました。`
-            : payload.unsupported
-            ? "この会社は企業マスタと株価のみ登録済みです。"
-            : payload.synced
-            ? `${payload.synced}件の決算データを再取得しました。`
-            : "この会社は公式IR取込データが未登録です。"
-          : "保存済みの最新データを表示しています。",
-      );
+      showToast(payload ? `${payload.saved}件のEDINET書類を保存しました。` : "保存済みの最新データを表示しています。");
     }
   } catch (error) {
     addSyncLog("error", "同期失敗", error.message, companyCode);
@@ -1505,6 +1153,20 @@ function normalizeResult(item) {
     pretaxIncome: item.pretax_income ?? item.pretaxIncome ?? null,
     netIncome: item.net_income ?? item.netIncome,
     sourceUrl: item.source_url ?? item.sourceUrl,
+  };
+}
+
+function normalizeEdinetDocument(item) {
+  return {
+    id: item.id,
+    companyCode: item.company_code ?? item.companyCode,
+    edinetCode: item.edinet_code ?? item.edinetCode,
+    filerName: item.filer_name ?? item.filerName,
+    description: item.description,
+    periodStart: item.period_start ?? item.periodStart,
+    periodEnd: item.period_end ?? item.periodEnd,
+    submittedAt: item.submitted_at ?? item.submittedAt,
+    pdfUrl: item.pdf_url ?? item.pdfUrl,
   };
 }
 
