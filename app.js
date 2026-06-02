@@ -1136,9 +1136,13 @@ async function loadOfficialIrDocuments(companyCode) {
 }
 
 async function syncTodayEdinetDocuments(companyCode, config) {
-  addSyncLog("info", "EDINET同期 開始", "本日提出された対象企業の書類をDBへ保存します。", companyCode);
+  addSyncLog("info", "EDINET同期 開始", "金融庁EDINET APIから本日提出された対象企業の書類を取得し、DBへ保存します。", companyCode);
   try {
     const payload = await fetchJson("/api/edinet/sync", { method: "POST" });
+    if (payload.edinetError) {
+      addSyncLog("error", "EDINET同期 失敗", payload.edinetError, companyCode);
+      return { ...payload, edinetSyncFailed: true };
+    }
     if (!payload.persisted && payload.documents?.length) {
       addSyncLog("info", "EDINET保存 開始", "ブラウザのSupabase接続で保存します。", companyCode);
       await fetchJson(`${config.supabaseUrl}/rest/v1/earn_edinet_documents?on_conflict=id`, {

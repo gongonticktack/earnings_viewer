@@ -11,7 +11,7 @@ const edinetCompanies = {
 };
 
 const edinetDocumentTypes = new Set(["120", "130", "140", "150", "160", "170"]);
-const edinetBaseUrl = "https://api.edinet-fsa.go.jp/api/v2";
+const edinetApiBaseUrl = "https://api.edinet-fsa.go.jp/api/v2";
 const irSources = {
   toyota: {
     sourcePage: "https://global.toyota/jp/ir/financial-results/",
@@ -78,7 +78,7 @@ function isDate(value) {
 }
 
 function edinetUrl(path, apiKey, params = {}) {
-  const url = new URL(`${edinetBaseUrl}${path}`);
+  const url = new URL(`${edinetApiBaseUrl}${path}`);
   url.searchParams.set("Subscription-Key", apiKey);
   for (const [key, value] of Object.entries(params)) url.searchParams.set(key, value);
   return url;
@@ -89,10 +89,18 @@ async function fetchEdinetDocumentList(env, date) {
   const response = await fetch(edinetUrl("/documents.json", env.EDINET_API_KEY, { date, type: "2" }), {
     headers: { "User-Agent": "earnings-viewer/1.0" },
   });
-  if (!response.ok) throw new Error(`EDINET document list request failed (${response.status})`);
-  const payload = await response.json();
-  if (payload.metadata?.status && payload.metadata.status !== "200") {
-    throw new Error(payload.metadata.message ?? "EDINET returned an error");
+  const text = await response.text();
+  if (!response.ok) {
+    throw new Error(`Financial Services Agency EDINET API request failed (${response.status}): ${text.slice(0, 500)}`);
+  }
+  let payload;
+  try {
+    payload = JSON.parse(text);
+  } catch {
+    throw new Error(`Financial Services Agency EDINET API returned an invalid response: ${text.slice(0, 500)}`);
+  }
+  if (payload.metadata?.status && String(payload.metadata.status) !== "200") {
+    throw new Error(payload.metadata.message ?? "Financial Services Agency EDINET API returned an error");
   }
   return payload.results ?? [];
 }
@@ -165,7 +173,18 @@ async function syncEdinetDocuments(request, env) {
   const date = url.searchParams.get("date") ?? jstDate();
   if (!isDate(date)) return jsonError("date must be YYYY-MM-DD", 400);
 
-  const documents = filterEdinetDocuments(await fetchEdinetDocumentList(env, date));
+  let documents;
+  try {
+    documents = filterEdinetDocuments(await fetchEdinetDocumentList(env, date));
+  } catch (error) {
+    return Response.json({
+      date,
+      saved: 0,
+      persisted: false,
+      edinetError: error instanceof Error ? error.message : String(error),
+      documents: [],
+    });
+  }
   let persisted = false;
   let persistenceError = null;
   try {
@@ -303,7 +322,7 @@ export default {
 
       return new Response("Not found", { status: 404 });
     } catch (error) {
-      return jsonError(error.message);
+      return jsonError(error);
     }
   },
 
