@@ -1136,33 +1136,46 @@ async function loadOfficialIrDocuments(companyCode) {
 }
 
 async function syncTodayEdinetDocuments(companyCode, config) {
-  addSyncLog("info", "EDINET同期 開始", "金融庁EDINET APIから直近31日分の対象企業の書類を取得し、DBへ保存します。", companyCode);
+  const configuredHistoryDays = Number(config.edinet?.historyDays);
+  const configuredBatchDays = Number(config.edinet?.batchDays);
+  const historyDays = Number.isInteger(configuredHistoryDays) && configuredHistoryDays > 0
+    ? Math.min(configuredHistoryDays, 400)
+    : 400;
+  const batchDays = Number.isInteger(configuredBatchDays) && configuredBatchDays > 0
+    ? Math.min(configuredBatchDays, 31)
+    : 31;
+  const batches = Math.ceil(historyDays / batchDays);
+  let saved = 0;
+  addSyncLog("info", "EDINET同期 開始", `金融庁EDINET APIから過去${historyDays}日分の対象企業の書類を取得し、DBへ保存します。`, companyCode);
   try {
-    const payload = await fetchJson(`${window.APP_CONFIG.api.edinetSync}?days=31`, { method: "POST" });
-    if (payload.edinetError) {
-      addSyncLog("error", "EDINET同期 失敗", payload.edinetError, companyCode);
-      return { ...payload, edinetSyncFailed: true };
+    for (let index = 0; index < batches; index += 1) {
+      const date = new Date();
+      date.setUTCDate(date.getUTCDate() - index * batchDays);
+      const days = Math.min(batchDays, historyDays - index * batchDays);
+      const endDate = date.toISOString().slice(0, 10);
+      const payload = await fetchJson(`${window.APP_CONFIG.api.edinetSync}?date=${endDate}&days=${days}`, { method: "POST" });
+      if (payload.edinetError) {
+        addSyncLog("error", "EDINET同期 失敗", payload.edinetError, companyCode);
+        return { ...payload, saved, edinetSyncFailed: true };
+      }
+      if (!payload.persisted && payload.documents?.length) {
+        await fetchJson(`${config.supabaseUrl}/rest/v1/earn_edinet_documents?on_conflict=id`, {
+          method: "POST",
+          headers: {
+            ...apiHeaders(config),
+            Prefer: "resolution=merge-duplicates,return=minimal",
+          },
+          body: JSON.stringify(payload.documents),
+        });
+      }
+      if (payload.persistenceError) {
+        addSyncLog("error", "Worker保存 失敗", payload.persistenceError, companyCode);
+      }
+      saved += payload.documents?.length ?? 0;
     }
-    if (!payload.persisted && payload.documents?.length) {
-      addSyncLog("info", "EDINET保存 開始", "ブラウザのSupabase接続で保存します。", companyCode);
-      await fetchJson(`${config.supabaseUrl}/rest/v1/earn_edinet_documents?on_conflict=id`, {
-        method: "POST",
-        headers: {
-          ...apiHeaders(config),
-          Prefer: "resolution=merge-duplicates,return=minimal",
-        },
-        body: JSON.stringify(payload.documents),
-      });
-      payload.saved = payload.documents.length;
-      payload.persisted = true;
-      addSyncLog("success", "EDINET保存 完了", `${payload.saved}件の書類をDBへ保存しました。`, companyCode);
-    }
-    if (payload.persistenceError) {
-      addSyncLog("error", "Worker保存 失敗", payload.persistenceError, companyCode);
-    }
-    addSyncLog("success", "EDINET同期 完了", `${payload.saved}件の書類をDBへ保存しました。`, companyCode);
+    addSyncLog("success", "EDINET同期 完了", `${saved}件の書類をDBへ保存しました。`, companyCode);
     await loadCachedCompanyData(companyCode, config);
-    return payload;
+    return { saved };
   } catch (error) {
     addSyncLog("error", "EDINET同期 失敗", error.message, companyCode);
     return { saved: 0, edinetSyncFailed: true };

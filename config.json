@@ -9,6 +9,8 @@
     "edinetSync": "/api/edinet/sync"
   },
   "edinet": {
-    "apiKey": "83280ded1fd14cf194db10c732c14762"
+    "apiKey": "83280ded1fd14cf194db10c732c14762",
+    "historyDays": 400,
+    "batchDays": 31
   }
 }

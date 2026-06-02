@@ -60,7 +60,7 @@ EDINET API キーは [EDINET API利用登録](https://api.edinet-fsa.go.jp/api/a
 
 Cloudflare Cron Trigger が毎日 00:15 JST に当日分のEDINET書類一覧を取得します。対象企業の有価証券報告書、半期報告書、旧四半期報告書と各訂正報告書を `earn_edinet_documents` へ保存します。
 
-画面の `更新` を押すと、公式IR PDF一覧と当日分のEDINET提出情報を再取得します。過去日を取り込む場合は、配信済みWorkerに対して日付を指定します。
+画面の `更新` を押すと、公式IR PDF一覧と `config.json` の `edinet.historyDays` で指定した期間のEDINET提出情報を再取得します。金融庁APIには `edinet.batchDays` ごとに分割して問い合わせます。過去日を個別に取り込む場合は、配信済みWorkerに対して日付を指定します。
 
 ```powershell
 curl.exe -X POST "https://<worker-domain>/api/edinet/sync?date=2026-06-01"
