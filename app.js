@@ -327,6 +327,7 @@ const elements = {
   periodCaption: document.querySelector("#period-caption"),
   latestUpdate: document.querySelector("#latest-update"),
   syncButton: document.querySelector("#sync-button"),
+  syncButtonLabel: document.querySelector("#sync-button-label"),
   documentsBody: document.querySelector("#documents-body"),
   toast: document.querySelector("#toast"),
   marginValue: document.querySelector("#margin-value"),
@@ -358,17 +359,15 @@ const metricKey = {
 };
 
 function formatBillions(value) {
-  const sign = value < 0 ? "-" : "";
-  const absolute = Math.abs(value);
-  const trillion = Math.floor(absolute / 1000000);
-  const oku = Math.floor((absolute % 1000000) / 100);
-  const man = (absolute % 100) * 100;
+  const totalOku = Math.floor(Math.abs(value) / 100);
+  const sign = value < 0 && totalOku ? "-" : "";
+  const trillion = Math.floor(totalOku / 10000);
+  const oku = totalOku % 10000;
   const parts = [];
 
   if (trillion) parts.push(`${trillion.toLocaleString("ja-JP")}兆`);
-  if (oku) parts.push(`${oku.toLocaleString("ja-JP")}億`);
-  if (man) parts.push(`${man.toLocaleString("ja-JP")}万円`);
-  return `${sign}${parts.join("") || "0円"}`;
+  parts.push(`${oku.toLocaleString("ja-JP")}億円`);
+  return `${sign}${parts.join("")}`;
 }
 
 function formatOptionalBillions(value) {
@@ -376,11 +375,7 @@ function formatOptionalBillions(value) {
 }
 
 function formatCompactYen(value) {
-  const sign = value < 0 ? "-" : "";
-  const absolute = Math.abs(value);
-  if (absolute >= 1000000) return `${sign}${(absolute / 1000000).toFixed(2)}兆円`;
-  if (absolute >= 100) return `${sign}${Math.round(absolute / 100).toLocaleString("ja-JP")}億円`;
-  return `${sign}${absolute.toLocaleString("ja-JP")}百万円`;
+  return formatBillions(value);
 }
 
 function formatMillions(value) {
@@ -661,7 +656,7 @@ function drawWaterfallChart() {
   const canReconcile = previousCash !== null && currentCash !== null;
   let runningTotal = canReconcile ? previousCash : 0;
   const bars = canReconcile
-    ? [{ label: `${analysis.previousFiscalYear}\n期末現金`, value: previousCash, start: 0, end: previousCash, total: true }]
+    ? [{ label: "前期末\n現金", value: previousCash, start: 0, end: previousCash, total: true }]
     : [];
 
   flowBars.forEach((bar) => {
@@ -676,7 +671,7 @@ function drawWaterfallChart() {
       bars.push({ label: "その他\n調整", value: adjustment, start: runningTotal, end: currentCash });
     }
     bars.push({
-      label: `${analysis.currentFiscalYear}\n期末現金`,
+      label: "今期末\n現金",
       value: currentCash,
       start: currentCash,
       end: currentCash,
@@ -906,6 +901,7 @@ function renderCompany() {
   elements.companyButtons.forEach((button) => {
     button.classList.toggle("active", button.dataset.company === state.companyCode);
   });
+  updateSyncButtonAvailability();
 }
 
 function render() {
@@ -929,6 +925,19 @@ function isOlderThanThreeMonths(dateString) {
   const threshold = new Date();
   threshold.setMonth(threshold.getMonth() - 3);
   return new Date(dateString) < threshold;
+}
+
+function hasRegisteredSourceData(companyCode) {
+  return Boolean(fallbackResults[companyCode]?.length);
+}
+
+function updateSyncButtonAvailability({ loading = false } = {}) {
+  const isSupported = hasRegisteredSourceData(state.companyCode);
+  elements.syncButton.disabled = loading || !isSupported;
+  elements.syncButton.title = isSupported
+    ? "JSへ登録済みの公式IRデータをDBへ再保存します。"
+    : "公式IRデータの取込処理は未登録です。";
+  elements.syncButtonLabel.textContent = isSupported ? "今すぐ再取得" : "IR取込未対応";
 }
 
 function addSyncLog(level, stage, message, companyCode = state.companyCode) {
@@ -961,7 +970,7 @@ function renderSyncLogs() {
     .map(
       (log) => `
         <article class="sync-log-entry ${log.level}">
-          <span class="sync-log-status">${log.level === "error" ? "FAILED" : log.level === "info" ? "WAITING" : "SUCCESS"}</span>
+          <span class="sync-log-status">${log.level === "error" ? "FAILED" : log.level === "info" ? "WAITING" : log.level === "unsupported" ? "UNSUPPORTED" : "SUCCESS"}</span>
           <span class="sync-log-time">${new Intl.DateTimeFormat("ja-JP", {
             hour: "2-digit",
             minute: "2-digit",
@@ -1121,22 +1130,23 @@ function serializeAnnualFlow(companyCode, item) {
 }
 
 async function invokeSync(companyCode, config) {
-  addSyncLog("success", "データ種別", `${registeredDataDescription}: 四半期${fallbackResults[companyCode].length}件`, companyCode);
-  addSyncLog("success", "DB保存開始", "JSへ登録済みの決算データをDBへ保存します。", companyCode);
   const baseUrl = `${config.supabaseUrl}/rest/v1`;
   const syncedAt = new Date().toISOString();
   const results = fallbackResults[companyCode].map((item) => serializeResult(companyCode, item));
-  const annualFlow = annualAnalyses[companyCode] ? serializeAnnualFlow(companyCode, annualAnalyses[companyCode]) : null;
 
-  if (!results.length && !annualFlow) {
+  if (!hasRegisteredSourceData(companyCode)) {
     addSyncLog(
-      "info",
-      "DB保存保留",
-      "この会社は公式IRから取り込む元データがJSへ未登録です。通信待ちではありません。",
+      "unsupported",
+      "IR取込未対応",
+      "企業マスタと株価のみ登録済みです。決算データを取得するには、この会社向けの公式IR取込処理を追加する必要があります。",
       companyCode,
     );
-    return { synced: 0, lastSyncedAt: state.lastSyncedAtByCompany[companyCode] ?? null };
+    return { synced: 0, unsupported: true, lastSyncedAt: state.lastSyncedAtByCompany[companyCode] ?? null };
   }
+
+  const annualFlow = annualAnalyses[companyCode] ? serializeAnnualFlow(companyCode, annualAnalyses[companyCode]) : null;
+  addSyncLog("success", "データ種別", `${registeredDataDescription}: 四半期${results.length}件`, companyCode);
+  addSyncLog("success", "DB保存開始", "JSへ登録済みの決算データをDBへ保存します。", companyCode);
 
   if (results.length) {
     await fetchJsonWithSyncLog(
@@ -1179,8 +1189,8 @@ async function invokeSync(companyCode, config) {
 async function refreshCompany({ force = false, notify = false } = {}) {
   const config = window.APP_CONFIG ?? {};
   const companyCode = state.companyCode;
-  elements.syncButton.disabled = true;
   elements.syncButton.classList.add("loading");
+  updateSyncButtonAvailability({ loading: true });
 
   try {
     if (!config.supabaseUrl || !config.supabaseAnonKey) {
@@ -1206,7 +1216,9 @@ async function refreshCompany({ force = false, notify = false } = {}) {
     if (notify || payload) {
       showToast(
         payload
-          ? payload.synced
+          ? payload.unsupported
+            ? "この会社は企業マスタと株価のみ登録済みです。"
+            : payload.synced
             ? `${payload.synced}件の決算データを再取得しました。`
             : "この会社は公式IR取込データが未登録です。"
           : "保存済みの最新データを表示しています。",
@@ -1216,8 +1228,8 @@ async function refreshCompany({ force = false, notify = false } = {}) {
     addSyncLog("error", "同期失敗", error.message, companyCode);
     showToast(error.message);
   } finally {
-    elements.syncButton.disabled = false;
     elements.syncButton.classList.remove("loading");
+    updateSyncButtonAvailability();
   }
 }
 
