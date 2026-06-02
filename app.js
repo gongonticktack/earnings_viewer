@@ -22,6 +22,41 @@ const companies = {
     sourcePage: "https://www.softbank.jp/corp/ir/documents/financial_reports/",
     stockSymbol: "9434.T",
   },
+  "softbank-group": {
+    code: "softbank-group",
+    name: "SOFTBANK GROUP CORP.",
+    sourceName: "SOFTBANK GROUP IR",
+    sourcePage: "https://group.softbank/en/ir/financials",
+    stockSymbol: "9984.T",
+  },
+  mufg: {
+    code: "mufg",
+    name: "MITSUBISHI UFJ FINANCIAL GROUP",
+    sourceName: "MUFG IR",
+    sourcePage: "https://www.mufg.jp/ir/index.html",
+    stockSymbol: "8306.T",
+  },
+  "fast-retailing": {
+    code: "fast-retailing",
+    name: "FAST RETAILING CO., LTD.",
+    sourceName: "FAST RETAILING IR",
+    sourcePage: "https://www.fastretailing.com/jp/ir/",
+    stockSymbol: "9983.T",
+  },
+  hitachi: {
+    code: "hitachi",
+    name: "HITACHI, LTD.",
+    sourceName: "HITACHI IR",
+    sourcePage: "https://www.hitachi.com/ja-jp/ir/library/fr/",
+    stockSymbol: "6501.T",
+  },
+  smfg: {
+    code: "smfg",
+    name: "SUMITOMO MITSUI FINANCIAL GROUP",
+    sourceName: "SMFG IR",
+    sourcePage: "https://www.smfg.co.jp/investor/financial/latest_statement.html",
+    stockSymbol: "8316.T",
+  },
 };
 
 // Official PDFs publish cumulative values. Each entry below is normalized to a standalone quarter.
@@ -204,6 +239,11 @@ const fallbackResults = {
       sourceUrl: "https://www.softbank.jp/corp/set/data/ir/documents/financial_reports/fy2025/pdf/sbkk_financial_report_20260511.pdf",
     },
   ],
+  "softbank-group": [],
+  mufg: [],
+  "fast-retailing": [],
+  hitachi: [],
+  smfg: [],
 };
 
 const registeredDataDescription = "公式IR資料をもとにJSへ登録済みのデータ（リアルタイム自動取得ではありません）";
@@ -306,7 +346,6 @@ const elements = {
   logClearButton: document.querySelector("#log-clear-button"),
   stockChart: document.querySelector("#stock-chart"),
   stockChartStatus: document.querySelector("#stock-chart-status"),
-  stockButtons: document.querySelectorAll(".stock-symbol-button"),
 };
 
 const metricIds = ["revenue", "cost", "operating", "net"];
@@ -359,6 +398,7 @@ function activeResult() {
 }
 
 function previousResult(result) {
+  if (!result) return null;
   const currentIndex = state.results.findIndex((item) => item.id === result.id);
   return currentIndex > 0 ? state.results[currentIndex - 1] : null;
 }
@@ -371,10 +411,22 @@ function renderPicker() {
     )
     .join("");
   elements.quarterSelect.value = state.activeId;
+  elements.quarterSelect.disabled = !state.results.length;
 }
 
 function renderMetrics() {
   const current = activeResult();
+  if (!current) {
+    elements.periodCaption.textContent = "決算データ準備中";
+    metricIds.forEach((metric) => {
+      document.querySelector(`#metric-${metric}`).textContent = "—";
+      document.querySelector(`#change-${metric}`).textContent = "PENDING";
+    });
+    elements.marginValue.textContent = "—";
+    elements.marginChange.textContent = "公式IR資料を確認中";
+    elements.marginChange.style.color = "var(--muted)";
+    return;
+  }
   const previous = previousResult(current);
   elements.periodCaption.textContent = `決算期間終了日 ${formatDate(current.periodEnd)}`;
 
@@ -404,6 +456,10 @@ function renderMetrics() {
 }
 
 function renderDocuments() {
+  if (!state.results.length) {
+    elements.documentsBody.innerHTML = '<tr><td colspan="6">公式IR資料から登録する決算データを準備中です。</td></tr>';
+    return;
+  }
   elements.documentsBody.innerHTML = [...state.results]
     .reverse()
     .map(
@@ -431,8 +487,21 @@ function prepareCanvas(canvas) {
   return { context, width: rect.width, height: rect.height };
 }
 
+function drawEmptyChart(canvas, message = "決算データ準備中") {
+  const { context: ctx, width, height } = prepareCanvas(canvas);
+  ctx.clearRect(0, 0, width, height);
+  ctx.fillStyle = "#9b998f";
+  ctx.font = '600 13px "Noto Sans JP"';
+  ctx.textAlign = "center";
+  ctx.fillText(message, width / 2, height / 2);
+}
+
 function drawPerformanceChart() {
   const canvas = document.querySelector("#performance-chart");
+  if (!state.results.length) {
+    drawEmptyChart(canvas);
+    return;
+  }
   const { context: ctx, width, height } = prepareCanvas(canvas);
   const padding = { top: 10, right: 22, bottom: 31, left: 9 };
   const chartWidth = width - padding.left - padding.right;
@@ -498,6 +567,10 @@ function drawPerformanceChart() {
 
 function drawMarginChart() {
   const canvas = document.querySelector("#margin-chart");
+  if (!state.results.length) {
+    drawEmptyChart(canvas);
+    return;
+  }
   const { context: ctx, width, height } = prepareCanvas(canvas);
   const padding = { top: 12, right: 10, bottom: 29, left: 10 };
   const chartWidth = width - padding.left - padding.right;
@@ -556,8 +629,12 @@ function drawMarginChart() {
 
 function drawWaterfallChart() {
   const canvas = document.querySelector("#waterfall-chart");
-  const { context: ctx, width, height } = prepareCanvas(canvas);
   const analysis = annualAnalyses[state.companyCode];
+  if (!analysis) {
+    drawEmptyChart(canvas, "年次キャッシュフロー準備中");
+    return;
+  }
+  const { context: ctx, width, height } = prepareCanvas(canvas);
   const previousCash = analysis.previousCashAndCashEquivalents;
   const currentCash = analysis.cashAndCashEquivalents;
   const flowBars = [
@@ -675,6 +752,20 @@ function calculateCashFlowAdjustment(analysis) {
 
 function renderAnnualFlow() {
   const analysis = annualAnalyses[state.companyCode];
+  if (!analysis) {
+    elements.flowPeriod.textContent = "PENDING";
+    [
+      elements.previousCashAndCashEquivalents,
+      elements.operatingCashFlow,
+      elements.investmentCashFlow,
+      elements.financingCashFlow,
+      elements.otherCashFlowAdjustment,
+      elements.cashAndCashEquivalents,
+    ].forEach((element) => {
+      element.textContent = "準備中";
+    });
+    return;
+  }
   elements.flowPeriod.textContent = analysis.currentFiscalYear;
   elements.previousCashAndCashEquivalents.textContent = formatOptionalBillions(analysis.previousCashAndCashEquivalents);
   elements.operatingCashFlow.textContent = formatOptionalBillions(analysis.operatingCashFlow);
@@ -697,10 +788,12 @@ function drawStockChart() {
   const padding = { top: 24, right: 22, bottom: 35, left: 62 };
   const chartWidth = width - padding.left - padding.right;
   const chartHeight = height - padding.top - padding.bottom;
-  const min = Math.min(...prices.map((item) => item.close));
-  const max = Math.max(...prices.map((item) => item.close));
+  const min = Math.min(...prices.map((item) => item.low));
+  const max = Math.max(...prices.map((item) => item.high));
   const span = Math.max(max - min, 1);
-  const scaleX = (index) => padding.left + (chartWidth / Math.max(prices.length - 1, 1)) * index;
+  const gap = chartWidth / prices.length;
+  const bodyWidth = Math.max(2, Math.min(8, gap * 0.64));
+  const scaleX = (index) => padding.left + gap * index + gap / 2;
   const scaleY = (value) => padding.top + chartHeight - ((value - min) / span) * chartHeight;
 
   ctx.clearRect(0, 0, width, height);
@@ -720,32 +813,25 @@ function drawStockChart() {
     ctx.fillText(`¥${Math.round(value).toLocaleString("ja-JP")}`, padding.left - 9, y + 3);
   }
 
-  const gradient = ctx.createLinearGradient(0, padding.top, 0, padding.top + chartHeight);
-  gradient.addColorStop(0, "rgba(214, 183, 122, .26)");
-  gradient.addColorStop(1, "rgba(214, 183, 122, 0)");
-  ctx.beginPath();
   prices.forEach((item, index) => {
     const x = scaleX(index);
-    const y = scaleY(item.close);
-    if (index === 0) ctx.moveTo(x, y);
-    else ctx.lineTo(x, y);
-  });
-  ctx.lineTo(scaleX(prices.length - 1), padding.top + chartHeight);
-  ctx.lineTo(scaleX(0), padding.top + chartHeight);
-  ctx.closePath();
-  ctx.fillStyle = gradient;
-  ctx.fill();
+    const openY = scaleY(item.open);
+    const highY = scaleY(item.high);
+    const lowY = scaleY(item.low);
+    const closeY = scaleY(item.close);
+    const rising = item.close >= item.open;
+    const color = rising ? "#82ba8e" : "#d8867f";
 
-  ctx.beginPath();
-  prices.forEach((item, index) => {
-    const x = scaleX(index);
-    const y = scaleY(item.close);
-    if (index === 0) ctx.moveTo(x, y);
-    else ctx.lineTo(x, y);
+    ctx.beginPath();
+    ctx.moveTo(x, highY);
+    ctx.lineTo(x, lowY);
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    ctx.fillStyle = color;
+    ctx.fillRect(x - bodyWidth / 2, Math.min(openY, closeY), bodyWidth, Math.max(2, Math.abs(closeY - openY)));
   });
-  ctx.strokeStyle = "#d6b77a";
-  ctx.lineWidth = 2;
-  ctx.stroke();
 
   const labelIndexes = [0, Math.floor((prices.length - 1) / 2), prices.length - 1];
   ctx.fillStyle = "#77756e";
@@ -759,24 +845,24 @@ async function renderStockChart() {
   const symbol = state.stockChartSymbol;
   if (state.renderedStockChartSymbol === symbol) return;
   state.renderedStockChartSymbol = symbol;
-  elements.stockButtons.forEach((button) => {
-    button.classList.toggle("active", button.dataset.symbol === symbol);
-  });
   elements.stockChartStatus.textContent = `${symbol} の週足を読み込んでいます。`;
 
   try {
     const payload = await fetchJson(`/api/stocks/${symbol}`);
     const result = payload.chart?.result?.[0];
     const timestamps = result?.timestamp ?? [];
-    const quotes = result?.indicators?.quote?.[0]?.close ?? [];
+    const quotes = result?.indicators?.quote?.[0] ?? {};
     state.stockPrices = timestamps
       .map((timestamp, index) => ({
         date: new Date(timestamp * 1000).toISOString().slice(0, 10),
-        close: quotes[index],
+        open: quotes.open?.[index],
+        high: quotes.high?.[index],
+        low: quotes.low?.[index],
+        close: quotes.close?.[index],
       }))
-      .filter((item) => Number.isFinite(item.close));
+      .filter((item) => [item.open, item.high, item.low, item.close].every(Number.isFinite));
     if (!state.stockPrices.length) throw new Error("株価データがありません。");
-    elements.stockChartStatus.textContent = `${symbol} / 週足終値 / 過去2年`;
+    elements.stockChartStatus.textContent = `${symbol} / 週足ローソク / 過去2年`;
     drawStockChart();
   } catch (error) {
     const { context: ctx, width, height } = prepareCanvas(elements.stockChart);
@@ -984,18 +1070,27 @@ async function invokeSync(companyCode, config) {
   const baseUrl = `${config.supabaseUrl}/rest/v1`;
   const syncedAt = new Date().toISOString();
   const results = fallbackResults[companyCode].map((item) => serializeResult(companyCode, item));
-  const annualFlow = serializeAnnualFlow(companyCode, annualAnalyses[companyCode]);
+  const annualFlow = annualAnalyses[companyCode] ? serializeAnnualFlow(companyCode, annualAnalyses[companyCode]) : null;
 
-  await fetchJson(`${baseUrl}/earn_quarterly_results?on_conflict=company_code,fiscal_year,quarter`, {
-    method: "POST",
-    headers: restWriteHeaders(config),
-    body: JSON.stringify(results),
-  });
-  await fetchJson(`${baseUrl}/earn_annual_profit_flows?on_conflict=company_code,current_fiscal_year`, {
-    method: "POST",
-    headers: restWriteHeaders(config),
-    body: JSON.stringify(annualFlow),
-  });
+  if (!results.length && !annualFlow) {
+    addSyncLog("success", "DB保存保留", "公式IR資料から登録する決算データを準備中です。", companyCode);
+    return { synced: 0, lastSyncedAt: state.lastSyncedAtByCompany[companyCode] ?? null };
+  }
+
+  if (results.length) {
+    await fetchJson(`${baseUrl}/earn_quarterly_results?on_conflict=company_code,fiscal_year,quarter`, {
+      method: "POST",
+      headers: restWriteHeaders(config),
+      body: JSON.stringify(results),
+    });
+  }
+  if (annualFlow) {
+    await fetchJson(`${baseUrl}/earn_annual_profit_flows?on_conflict=company_code,current_fiscal_year`, {
+      method: "POST",
+      headers: restWriteHeaders(config),
+      body: JSON.stringify(annualFlow),
+    });
+  }
   await fetchJson(`${baseUrl}/earn_companies?code=eq.${companyCode}`, {
     method: "PATCH",
     headers: restWriteHeaders(config),
@@ -1031,7 +1126,7 @@ async function refreshCompany({ force = false, notify = false } = {}) {
 
     if (state.companyCode === companyCode) {
       state.results = state.resultsByCompany[companyCode];
-      state.activeId = state.results.at(-1).id;
+      state.activeId = state.results.at(-1)?.id ?? null;
       updateLatestUpdate(companyCode);
       render();
     }
@@ -1092,16 +1187,10 @@ elements.companyButtons.forEach((button) => {
     state.companyCode = button.dataset.company;
     state.stockChartSymbol = companies[state.companyCode].stockSymbol;
     state.results = state.resultsByCompany[state.companyCode];
-    state.activeId = state.results.at(-1).id;
+    state.activeId = state.results.at(-1)?.id ?? null;
     updateLatestUpdate();
     render();
     await refreshCompany();
-  });
-});
-elements.stockButtons.forEach((button) => {
-  button.addEventListener("click", () => {
-    state.stockChartSymbol = button.dataset.symbol;
-    renderStockChart();
   });
 });
 elements.syncButton.addEventListener("click", () => refreshCompany({ force: true, notify: true }));
