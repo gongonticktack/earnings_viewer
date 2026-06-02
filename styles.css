@@ -84,7 +84,7 @@ body::after {
 .app-shell {
   display: grid;
   min-height: 100vh;
-  grid-template-columns: 230px 1fr;
+  grid-template-columns: 230px minmax(0, 1fr);
 }
 
 .sidebar {
@@ -282,6 +282,7 @@ body::after {
 
 .main-content {
   width: min(100%, 1600px);
+  min-width: 0;
   margin: 0 auto;
   padding: 30px 35px 40px;
 }
@@ -469,7 +470,7 @@ select {
   display: grid;
   margin-top: 17px;
   gap: 14px;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
 .metric-card {
@@ -507,8 +508,9 @@ select {
 .metric-card strong {
   display: block;
   margin: 17px 0 14px;
-  font: 700 24px/1 var(--font-display);
+  font: 700 clamp(16px, 1.35vw, 20px)/1 var(--font-display);
   letter-spacing: -0.05em;
+  overflow-wrap: anywhere;
 }
 
 .metric-footer {
@@ -538,10 +540,11 @@ select {
   display: grid;
   margin-top: 17px;
   gap: 14px;
-  grid-template-columns: 1.75fr 1fr;
+  grid-template-columns: minmax(0, 1.75fr) minmax(0, 1fr);
 }
 
 .panel {
+  min-width: 0;
   padding: 20px;
   border-radius: 7px;
 }
@@ -580,6 +583,14 @@ select {
   position: relative;
   height: 253px;
   margin-top: 22px;
+}
+
+.chart-container canvas,
+.waterfall-wrap canvas,
+.stock-chart canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
 }
 
 .margin-focus {
@@ -673,6 +684,11 @@ select {
   background: rgba(216, 134, 127, 0.1);
 }
 
+.sync-log-entry.info .sync-log-status {
+  color: var(--gold-soft);
+  background: rgba(214, 183, 122, 0.1);
+}
+
 .sync-log-time,
 .sync-log-entry small {
   color: var(--dim);
@@ -711,33 +727,34 @@ select {
 
 .flow-layout {
   display: grid;
+  height: 430px;
   margin-top: 19px;
   gap: 20px;
-  grid-template-columns: minmax(0, 1.7fr) minmax(235px, 0.7fr);
+  grid-template-columns: minmax(0, 1.45fr) minmax(390px, 1fr);
 }
 
 .waterfall-wrap {
   position: relative;
-  min-height: 560px;
-}
-
-.waterfall-wrap canvas {
-  width: 100%;
-  height: 100%;
-  min-height: 560px;
+  min-height: 0;
 }
 
 .flow-summary {
   display: grid;
-  align-content: start;
-  gap: 13px;
+  min-height: 0;
+  gap: 9px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-rows: repeat(4, minmax(0, 1fr));
 }
 
 .investment-card {
-  padding: 14px;
+  padding: 11px;
   border: 1px solid var(--line);
   border-radius: 6px;
   background: rgba(214, 183, 122, 0.045);
+}
+
+.investment-card:last-child {
+  grid-column: 1 / -1;
 }
 
 .investment-card small,
@@ -753,13 +770,14 @@ select {
 }
 
 .investment-card strong {
-  margin-top: 11px;
-  font: 700 20px/1 var(--font-display);
+  margin-top: 8px;
+  font: 700 14px/1.15 var(--font-display);
   letter-spacing: -0.04em;
+  overflow-wrap: anywhere;
 }
 
 .investment-card span {
-  margin-top: 7px;
+  margin-top: 5px;
   color: var(--dim);
   font-size: 9px;
 }
@@ -800,11 +818,6 @@ select {
   border: 1px solid var(--line);
   border-radius: 6px;
   background: rgba(23, 21, 17, 0.9);
-}
-
-.stock-chart canvas {
-  width: 100%;
-  height: 100%;
 }
 
 .stock-chart-status {
@@ -908,7 +921,12 @@ tbody tr.selected {
   }
 
   .flow-layout {
+    height: auto;
     grid-template-columns: 1fr;
+  }
+
+  .waterfall-wrap {
+    height: 390px;
   }
 }
 

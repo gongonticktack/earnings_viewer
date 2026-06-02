@@ -217,7 +217,7 @@
             <span class="flow-period" id="flow-period">—</span>
           </div>
           <p class="panel-description">
-            前期末現金から今期末現金まで、営業活動・投資活動・財務活動とその他調整による増減を表示します。
+            前期末現金に売上収益と主な支出を反映し、今期末現金までの変化を表示します。
           </p>
           <div class="flow-layout">
             <div class="waterfall-wrap">
@@ -230,9 +230,14 @@
                 <span>前期末の現金及び現金同等物残高</span>
               </div>
               <div class="investment-card">
-                <small>OPERATING CASH FLOW</small>
-                <strong id="operating-cash-flow">—</strong>
-                <span>営業活動によるキャッシュフロー</span>
+                <small>REVENUE</small>
+                <strong id="annual-revenue">—</strong>
+                <span>当年度の売上収益</span>
+              </div>
+              <div class="investment-card">
+                <small>OPERATING COSTS</small>
+                <strong id="annual-operating-cost">—</strong>
+                <span>原価、人件費、販売管理費など</span>
               </div>
               <div class="investment-card">
                 <small>INVESTING CASH FLOW</small>
@@ -247,7 +252,7 @@
               <div class="investment-card">
                 <small>OTHER ADJUSTMENTS</small>
                 <strong id="other-cash-flow-adjustment">—</strong>
-                <span>為替影響など、各活動CF以外の増減</span>
+                <span>税金、非現金項目、為替影響など</span>
               </div>
               <div class="investment-card">
                 <small>CASH AT END OF YEAR</small>
@@ -257,7 +262,7 @@
             </aside>
           </div>
           <p class="flow-note">
-            各活動CFだけで期末残高に一致しない場合は、為替影響などを「その他調整」として表示します。
+            売上収益と費用は会計上の計上額です。税金、非現金項目、運転資本の増減、為替影響などは「その他調整」にまとめています。
           </p>
         </section>
 

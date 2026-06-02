@@ -337,7 +337,8 @@ const elements = {
   companyButtons: document.querySelectorAll(".company-button"),
   flowPeriod: document.querySelector("#flow-period"),
   previousCashAndCashEquivalents: document.querySelector("#previous-cash-and-cash-equivalents"),
-  operatingCashFlow: document.querySelector("#operating-cash-flow"),
+  annualRevenue: document.querySelector("#annual-revenue"),
+  annualOperatingCost: document.querySelector("#annual-operating-cost"),
   investmentCashFlow: document.querySelector("#investment-cash-flow"),
   financingCashFlow: document.querySelector("#financing-cash-flow"),
   otherCashFlowAdjustment: document.querySelector("#other-cash-flow-adjustment"),
@@ -358,14 +359,28 @@ const metricKey = {
 
 function formatBillions(value) {
   const sign = value < 0 ? "-" : "";
-  return `${sign}¥${(Math.abs(value) / 1000).toLocaleString("ja-JP", {
-    minimumFractionDigits: 1,
-    maximumFractionDigits: 1,
-  })}B`;
+  const absolute = Math.abs(value);
+  const trillion = Math.floor(absolute / 1000000);
+  const oku = Math.floor((absolute % 1000000) / 100);
+  const man = (absolute % 100) * 100;
+  const parts = [];
+
+  if (trillion) parts.push(`${trillion.toLocaleString("ja-JP")}兆`);
+  if (oku) parts.push(`${oku.toLocaleString("ja-JP")}億`);
+  if (man) parts.push(`${man.toLocaleString("ja-JP")}万円`);
+  return `${sign}${parts.join("") || "0円"}`;
 }
 
 function formatOptionalBillions(value) {
   return value === null ? "開示なし" : formatBillions(value);
+}
+
+function formatCompactYen(value) {
+  const sign = value < 0 ? "-" : "";
+  const absolute = Math.abs(value);
+  if (absolute >= 1000000) return `${sign}${(absolute / 1000000).toFixed(2)}兆円`;
+  if (absolute >= 100) return `${sign}${Math.round(absolute / 100).toLocaleString("ja-JP")}億円`;
+  return `${sign}${absolute.toLocaleString("ja-JP")}百万円`;
 }
 
 function formatMillions(value) {
@@ -417,13 +432,13 @@ function renderPicker() {
 function renderMetrics() {
   const current = activeResult();
   if (!current) {
-    elements.periodCaption.textContent = "決算データ準備中";
+    elements.periodCaption.textContent = "決算データ未登録";
     metricIds.forEach((metric) => {
       document.querySelector(`#metric-${metric}`).textContent = "—";
       document.querySelector(`#change-${metric}`).textContent = "PENDING";
     });
     elements.marginValue.textContent = "—";
-    elements.marginChange.textContent = "公式IR資料を確認中";
+    elements.marginChange.textContent = "公式IR取込待ち";
     elements.marginChange.style.color = "var(--muted)";
     return;
   }
@@ -457,7 +472,7 @@ function renderMetrics() {
 
 function renderDocuments() {
   if (!state.results.length) {
-    elements.documentsBody.innerHTML = '<tr><td colspan="6">公式IR資料から登録する決算データを準備中です。</td></tr>';
+    elements.documentsBody.innerHTML = '<tr><td colspan="6">決算データは未登録です。公式IR取込処理の追加が必要です。</td></tr>';
     return;
   }
   elements.documentsBody.innerHTML = [...state.results]
@@ -479,7 +494,7 @@ function renderDocuments() {
 
 function prepareCanvas(canvas) {
   const ratio = window.devicePixelRatio || 1;
-  const rect = canvas.getBoundingClientRect();
+  const rect = canvas.parentElement?.getBoundingClientRect() ?? canvas.getBoundingClientRect();
   canvas.width = rect.width * ratio;
   canvas.height = rect.height * ratio;
   const context = canvas.getContext("2d");
@@ -487,7 +502,7 @@ function prepareCanvas(canvas) {
   return { context, width: rect.width, height: rect.height };
 }
 
-function drawEmptyChart(canvas, message = "決算データ準備中") {
+function drawEmptyChart(canvas, message = "決算データ未登録") {
   const { context: ctx, width, height } = prepareCanvas(canvas);
   ctx.clearRect(0, 0, width, height);
   ctx.fillStyle = "#9b998f";
@@ -631,16 +646,17 @@ function drawWaterfallChart() {
   const canvas = document.querySelector("#waterfall-chart");
   const analysis = annualAnalyses[state.companyCode];
   if (!analysis) {
-    drawEmptyChart(canvas, "年次キャッシュフロー準備中");
+    drawEmptyChart(canvas, "年次キャッシュフロー未登録");
     return;
   }
   const { context: ctx, width, height } = prepareCanvas(canvas);
   const previousCash = analysis.previousCashAndCashEquivalents;
   const currentCash = analysis.cashAndCashEquivalents;
   const flowBars = [
-    { label: "営業活動\nCF", value: analysis.operatingCashFlow },
-    { label: "投資活動\nCF", value: analysis.investingCashFlow },
-    { label: "財務活動\nCF", value: analysis.financingCashFlow },
+    { label: "売上収益", value: analysis.currentRevenue },
+    { label: "原価・人件費\nなど", value: -analysis.currentOperatingCost },
+    { label: "投資活動", value: analysis.investingCashFlow },
+    { label: "財務活動", value: analysis.financingCashFlow },
   ].filter((bar) => bar.value !== null);
   const canReconcile = previousCash !== null && currentCash !== null;
   let runningTotal = canReconcile ? previousCash : 0;
@@ -655,7 +671,7 @@ function drawWaterfallChart() {
   });
 
   if (canReconcile) {
-    const adjustment = calculateCashFlowAdjustment(analysis);
+    const adjustment = calculateProfitCashAdjustment(analysis);
     if (adjustment !== 0) {
       bars.push({ label: "その他\n調整", value: adjustment, start: runningTotal, end: currentCash });
     }
@@ -730,7 +746,7 @@ function drawWaterfallChart() {
     ctx.fillStyle = bar.total ? "#d6b77a" : bar.value >= 0 ? "#82ba8e" : "#d8867f";
     ctx.font = '700 10px "Manrope"';
     ctx.textAlign = "center";
-    const valueLabel = `${bar.value >= 0 && !bar.total ? "+" : ""}${formatBillions(bar.value)}`;
+    const valueLabel = `${bar.value >= 0 && !bar.total ? "+" : ""}${formatCompactYen(bar.value)}`;
     const labelY = endY + (bar.value < 0 && !bar.total ? 16 : -10);
     ctx.fillText(valueLabel, x, labelY);
 
@@ -742,12 +758,17 @@ function drawWaterfallChart() {
   });
 }
 
-function calculateCashFlowAdjustment(analysis) {
+function calculateProfitCashAdjustment(analysis) {
   if (analysis.previousCashAndCashEquivalents === null || analysis.cashAndCashEquivalents === null) return null;
-  const disclosedFlows = [analysis.operatingCashFlow, analysis.investingCashFlow, analysis.financingCashFlow]
+  const disclosedChanges = [
+    analysis.currentRevenue,
+    -analysis.currentOperatingCost,
+    analysis.investingCashFlow,
+    analysis.financingCashFlow,
+  ]
     .filter((value) => value !== null)
     .reduce((total, value) => total + value, 0);
-  return analysis.cashAndCashEquivalents - analysis.previousCashAndCashEquivalents - disclosedFlows;
+  return analysis.cashAndCashEquivalents - analysis.previousCashAndCashEquivalents - disclosedChanges;
 }
 
 function renderAnnualFlow() {
@@ -756,22 +777,24 @@ function renderAnnualFlow() {
     elements.flowPeriod.textContent = "PENDING";
     [
       elements.previousCashAndCashEquivalents,
-      elements.operatingCashFlow,
+      elements.annualRevenue,
+      elements.annualOperatingCost,
       elements.investmentCashFlow,
       elements.financingCashFlow,
       elements.otherCashFlowAdjustment,
       elements.cashAndCashEquivalents,
     ].forEach((element) => {
-      element.textContent = "準備中";
+      element.textContent = "未登録";
     });
     return;
   }
   elements.flowPeriod.textContent = analysis.currentFiscalYear;
   elements.previousCashAndCashEquivalents.textContent = formatOptionalBillions(analysis.previousCashAndCashEquivalents);
-  elements.operatingCashFlow.textContent = formatOptionalBillions(analysis.operatingCashFlow);
+  elements.annualRevenue.textContent = formatOptionalBillions(analysis.currentRevenue);
+  elements.annualOperatingCost.textContent = formatOptionalBillions(-analysis.currentOperatingCost);
   elements.investmentCashFlow.textContent = formatOptionalBillions(analysis.investingCashFlow);
   elements.financingCashFlow.textContent = formatOptionalBillions(analysis.financingCashFlow);
-  elements.otherCashFlowAdjustment.textContent = formatOptionalBillions(calculateCashFlowAdjustment(analysis));
+  elements.otherCashFlowAdjustment.textContent = formatOptionalBillions(calculateProfitCashAdjustment(analysis));
   elements.cashAndCashEquivalents.textContent = formatOptionalBillions(analysis.cashAndCashEquivalents);
 }
 
@@ -938,7 +961,7 @@ function renderSyncLogs() {
     .map(
       (log) => `
         <article class="sync-log-entry ${log.level}">
-          <span class="sync-log-status">${log.level === "error" ? "FAILED" : "SUCCESS"}</span>
+          <span class="sync-log-status">${log.level === "error" ? "FAILED" : log.level === "info" ? "WAITING" : "SUCCESS"}</span>
           <span class="sync-log-time">${new Intl.DateTimeFormat("ja-JP", {
             hour: "2-digit",
             minute: "2-digit",
@@ -973,18 +996,44 @@ function apiHeaders(config) {
 }
 
 async function fetchJson(url, options = {}) {
-  const response = await fetch(url, options);
-  if (!response.ok) {
-    const payload = await response.json().catch(() => ({}));
-    const detail = payload.error ?? payload.message;
-    const detailText = detail ? `: ${detail}` : "";
-    const stage = payload.stage ? ` [${payload.stage}]` : "";
-    throw new Error(
-      `データ取得に失敗しました (${response.status})${stage}${detailText} @ ${new URL(url, window.location.href).pathname}`,
-    );
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), 15000);
+  try {
+    const response = await fetch(url, { ...options, signal: options.signal ?? controller.signal });
+    if (!response.ok) {
+      const payload = await response.json().catch(() => ({}));
+      const detail = payload.error ?? payload.message;
+      const detailText = detail ? `: ${detail}` : "";
+      const stage = payload.stage ? ` [${payload.stage}]` : "";
+      throw new Error(
+        `データ取得に失敗しました (${response.status})${stage}${detailText} @ ${new URL(url, window.location.href).pathname}`,
+      );
+    }
+    const text = await response.text();
+    return text ? JSON.parse(text) : null;
+  } catch (error) {
+    if (error.name === "AbortError") {
+      throw new Error(`15秒以内に応答がありません @ ${new URL(url, window.location.href).pathname}`);
+    }
+    throw error;
+  } finally {
+    window.clearTimeout(timeout);
   }
-  const text = await response.text();
-  return text ? JSON.parse(text) : null;
+}
+
+async function fetchJsonWithSyncLog(url, options, { companyCode, stage, description }) {
+  const startedAt = performance.now();
+  addSyncLog("info", `${stage} 開始`, `${description}を問い合わせています。`, companyCode);
+  try {
+    const payload = await fetchJson(url, options);
+    const elapsed = Math.round(performance.now() - startedAt);
+    addSyncLog("success", `${stage} 完了`, `${description}を取得しました。${elapsed}ms`, companyCode);
+    return payload;
+  } catch (error) {
+    const elapsed = Math.round(performance.now() - startedAt);
+    addSyncLog("error", `${stage} 失敗`, `${description}で停止しました。${elapsed}ms: ${error.message}`, companyCode);
+    throw error;
+  }
 }
 
 async function loadCachedCompanyData(companyCode, config) {
@@ -992,13 +1041,20 @@ async function loadCachedCompanyData(companyCode, config) {
   const baseUrl = `${config.supabaseUrl}/rest/v1`;
   const headers = apiHeaders(config);
   const [companiesData, resultsData, flowsData] = await Promise.all([
-    fetchJson(`${baseUrl}/earn_companies?code=eq.${companyCode}&select=last_synced_at`, { headers }),
-    fetchJson(`${baseUrl}/earn_quarterly_results?company_code=eq.${companyCode}&select=*&order=period_end.asc`, {
-      headers,
-    }),
-    fetchJson(
+    fetchJsonWithSyncLog(
+      `${baseUrl}/earn_companies?code=eq.${companyCode}&select=last_synced_at`,
+      { headers },
+      { companyCode, stage: "企業マスタ読込", description: "前回同期日時" },
+    ),
+    fetchJsonWithSyncLog(
+      `${baseUrl}/earn_quarterly_results?company_code=eq.${companyCode}&select=*&order=period_end.asc`,
+      { headers },
+      { companyCode, stage: "四半期データ読込", description: "保存済み四半期データ" },
+    ),
+    fetchJsonWithSyncLog(
       `${baseUrl}/earn_annual_profit_flows?company_code=eq.${companyCode}&select=*&order=synced_at.desc&limit=1`,
       { headers },
+      { companyCode, stage: "年次CF読込", description: "保存済み年次キャッシュフロー" },
     ),
   ]);
 
@@ -1065,7 +1121,7 @@ function serializeAnnualFlow(companyCode, item) {
 }
 
 async function invokeSync(companyCode, config) {
-  addSyncLog("success", "データ種別", registeredDataDescription, companyCode);
+  addSyncLog("success", "データ種別", `${registeredDataDescription}: 四半期${fallbackResults[companyCode].length}件`, companyCode);
   addSyncLog("success", "DB保存開始", "JSへ登録済みの決算データをDBへ保存します。", companyCode);
   const baseUrl = `${config.supabaseUrl}/rest/v1`;
   const syncedAt = new Date().toISOString();
@@ -1073,29 +1129,46 @@ async function invokeSync(companyCode, config) {
   const annualFlow = annualAnalyses[companyCode] ? serializeAnnualFlow(companyCode, annualAnalyses[companyCode]) : null;
 
   if (!results.length && !annualFlow) {
-    addSyncLog("success", "DB保存保留", "公式IR資料から登録する決算データを準備中です。", companyCode);
+    addSyncLog(
+      "info",
+      "DB保存保留",
+      "この会社は公式IRから取り込む元データがJSへ未登録です。通信待ちではありません。",
+      companyCode,
+    );
     return { synced: 0, lastSyncedAt: state.lastSyncedAtByCompany[companyCode] ?? null };
   }
 
   if (results.length) {
-    await fetchJson(`${baseUrl}/earn_quarterly_results?on_conflict=company_code,fiscal_year,quarter`, {
-      method: "POST",
-      headers: restWriteHeaders(config),
-      body: JSON.stringify(results),
-    });
+    await fetchJsonWithSyncLog(
+      `${baseUrl}/earn_quarterly_results?on_conflict=company_code,fiscal_year,quarter`,
+      {
+        method: "POST",
+        headers: restWriteHeaders(config),
+        body: JSON.stringify(results),
+      },
+      { companyCode, stage: "四半期データ保存", description: `${results.length}件の四半期データ` },
+    );
   }
   if (annualFlow) {
-    await fetchJson(`${baseUrl}/earn_annual_profit_flows?on_conflict=company_code,current_fiscal_year`, {
-      method: "POST",
-      headers: restWriteHeaders(config),
-      body: JSON.stringify(annualFlow),
-    });
+    await fetchJsonWithSyncLog(
+      `${baseUrl}/earn_annual_profit_flows?on_conflict=company_code,current_fiscal_year`,
+      {
+        method: "POST",
+        headers: restWriteHeaders(config),
+        body: JSON.stringify(annualFlow),
+      },
+      { companyCode, stage: "年次CF保存", description: "年次キャッシュフロー" },
+    );
   }
-  await fetchJson(`${baseUrl}/earn_companies?code=eq.${companyCode}`, {
-    method: "PATCH",
-    headers: restWriteHeaders(config),
-    body: JSON.stringify({ last_synced_at: syncedAt }),
-  });
+  await fetchJsonWithSyncLog(
+    `${baseUrl}/earn_companies?code=eq.${companyCode}`,
+    {
+      method: "PATCH",
+      headers: restWriteHeaders(config),
+      body: JSON.stringify({ last_synced_at: syncedAt }),
+    },
+    { companyCode, stage: "同期日時保存", description: "最終同期日時" },
+  );
 
   state.resultsByCompany[companyCode] = fallbackResults[companyCode];
   state.lastSyncedAtByCompany[companyCode] = syncedAt;
@@ -1131,7 +1204,13 @@ async function refreshCompany({ force = false, notify = false } = {}) {
       render();
     }
     if (notify || payload) {
-      showToast(payload ? `${payload.synced}件の決算データを再取得しました。` : "保存済みの最新データを表示しています。");
+      showToast(
+        payload
+          ? payload.synced
+            ? `${payload.synced}件の決算データを再取得しました。`
+            : "この会社は公式IR取込データが未登録です。"
+          : "保存済みの最新データを表示しています。",
+      );
     }
   } catch (error) {
     addSyncLog("error", "同期失敗", error.message, companyCode);
