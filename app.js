@@ -550,6 +550,24 @@ function drawEmptyChart(canvas, message = "決算データ未登録") {
   ctx.fillText(message, width / 2, height / 2);
 }
 
+function labelIndexesForWidth(count, width, minGap = 58) {
+  if (count <= 0) return new Set();
+  const maxLabels = Math.max(2, Math.floor(width / minGap));
+  if (count <= maxLabels) return new Set(Array.from({ length: count }, (_, index) => index));
+
+  const indexes = new Set([0, count - 1]);
+  const slots = Math.max(1, maxLabels - 1);
+  for (let slot = 1; slot < slots; slot += 1) {
+    indexes.add(Math.round(((count - 1) / slots) * slot));
+  }
+  return indexes;
+}
+
+function clampedTextX(ctx, text, x, minX, maxX) {
+  const halfWidth = ctx.measureText(text).width / 2;
+  return Math.min(Math.max(x, minX + halfWidth), maxX - halfWidth);
+}
+
 function drawPerformanceChart() {
   const canvas = document.querySelector("#performance-chart");
   if (!state.results.length) {
@@ -564,6 +582,7 @@ function drawPerformanceChart() {
   const maxProfit = Math.max(...state.results.map(profitValue)) * 1.28;
   const gap = chartWidth / state.results.length;
   const barWidth = Math.min(47, gap * 0.38);
+  const visibleLabelIndexes = labelIndexesForWidth(state.results.length, chartWidth, 64);
 
   ctx.clearRect(0, 0, width, height);
   ctx.font = '600 9px "Manrope"';
@@ -593,7 +612,10 @@ function drawPerformanceChart() {
 
     ctx.fillStyle = "#77756e";
     ctx.textAlign = "center";
-    ctx.fillText(chartQuarterLabel(result), x, height - 7);
+    if (visibleLabelIndexes.has(index)) {
+      const label = chartQuarterLabel(result);
+      ctx.fillText(label, clampedTextX(ctx, label, x, padding.left, width - padding.right), height - 7);
+    }
 
     const profitY = padding.top + chartHeight - (profitValue(result) / maxProfit) * chartHeight;
     points.push({ x, y: profitY });
@@ -631,6 +653,7 @@ function drawMarginChart() {
   const chartHeight = height - padding.top - padding.bottom;
   const margins = state.results.map((item) => (profitValue(item) / item.revenue) * 100);
   const max = Math.max(...margins) * 1.14;
+  const visibleLabelIndexes = labelIndexesForWidth(margins.length, chartWidth, 66);
   const points = margins.map((margin, index) => ({
     x: padding.left + (chartWidth / (margins.length - 1)) * index,
     y: padding.top + chartHeight - (margin / max) * chartHeight,
@@ -677,7 +700,10 @@ function drawMarginChart() {
     ctx.fillStyle = "#77756e";
     ctx.textAlign = "center";
     ctx.font = '600 9px "Manrope"';
-    ctx.fillText(chartQuarterLabel(state.results[index]), point.x, height - 7);
+    if (visibleLabelIndexes.has(index)) {
+      const label = chartQuarterLabel(state.results[index]);
+      ctx.fillText(label, clampedTextX(ctx, label, point.x, padding.left, width - padding.right), height - 7);
+    }
   });
 }
 
@@ -728,6 +754,7 @@ function drawWaterfallChart() {
   const chartHeight = height - padding.top - padding.bottom;
   const gap = chartWidth / bars.length;
   const barWidth = Math.min(76, gap * 0.54);
+  const compactLabels = chartWidth < 360;
   const availableValues = bars.flatMap((bar) => [bar.start, bar.end]);
   const min = Math.min(0, ...availableValues);
   const max = Math.max(0, ...availableValues);
@@ -783,11 +810,16 @@ function drawWaterfallChart() {
     ctx.fillRect(x - barWidth / 2, Math.min(top, bottom), barWidth, Math.max(3, Math.abs(bottom - top)));
 
     ctx.fillStyle = bar.total ? "#d6b77a" : bar.value >= 0 ? "#82ba8e" : "#d8867f";
-    ctx.font = '700 10px "Manrope"';
+    ctx.font = compactLabels ? '700 9px "Manrope"' : '700 10px "Manrope"';
     ctx.textAlign = "center";
     const valueLabel = `${bar.value >= 0 && !bar.total ? "+" : ""}${formatCompactYen(bar.value)}`;
-    const labelY = endY + (bar.value < 0 && !bar.total ? 16 : -10);
-    ctx.fillText(valueLabel, x, labelY);
+    const labelOffset = compactLabels && index % 2 ? 25 : 14;
+    const preferredY = endY + (bar.value < 0 && !bar.total ? labelOffset : -labelOffset);
+    const minLabelY = padding.top + 10;
+    const maxLabelY = padding.top + chartHeight - 8;
+    const labelY = Math.min(Math.max(preferredY, minLabelY), maxLabelY);
+    const labelX = clampedTextX(ctx, valueLabel, x, padding.left, width - padding.right);
+    ctx.fillText(valueLabel, labelX, labelY);
 
     ctx.fillStyle = "#9b998f";
     ctx.font = '600 9px "Noto Sans JP"';
@@ -899,7 +931,8 @@ function drawStockChart() {
   ctx.fillStyle = "#77756e";
   ctx.textAlign = "center";
   labelIndexes.forEach((index) => {
-    ctx.fillText(formatDate(prices[index].date), scaleX(index), height - 9);
+    const label = formatDate(prices[index].date);
+    ctx.fillText(label, clampedTextX(ctx, label, scaleX(index), padding.left, width - padding.right), height - 9);
   });
 }
 
