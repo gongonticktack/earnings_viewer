@@ -195,3 +195,50 @@ grant insert, update on public.earn_edinet_documents to anon, authenticated;
 
 create index if not exists earn_edinet_documents_company_submitted_idx
   on public.earn_edinet_documents (company_code, submitted_at desc);
+
+create table if not exists public.earn_edinet_facts (
+  id text primary key,
+  document_id text not null references public.earn_edinet_documents(id) on delete cascade,
+  company_code text not null references public.earn_companies(code),
+  concept text not null,
+  label text not null,
+  value numeric,
+  unit_ref text,
+  decimals text,
+  context_ref text,
+  period_start date,
+  period_end date,
+  submitted_at timestamptz not null,
+  display_order integer not null default 999,
+  synced_at timestamptz not null default now(),
+  unique (document_id, concept, context_ref)
+);
+
+alter table public.earn_edinet_facts enable row level security;
+
+drop policy if exists "Earn EDINET facts are public" on public.earn_edinet_facts;
+create policy "Earn EDINET facts are public"
+  on public.earn_edinet_facts
+  for select
+  to anon, authenticated
+  using (true);
+
+drop policy if exists "Earn EDINET facts can be inserted" on public.earn_edinet_facts;
+create policy "Earn EDINET facts can be inserted"
+  on public.earn_edinet_facts
+  for insert
+  to anon, authenticated
+  with check (true);
+
+drop policy if exists "Earn EDINET facts can be updated" on public.earn_edinet_facts;
+create policy "Earn EDINET facts can be updated"
+  on public.earn_edinet_facts
+  for update
+  to anon, authenticated
+  using (true)
+  with check (true);
+
+grant insert, update on public.earn_edinet_facts to anon, authenticated;
+
+create index if not exists earn_edinet_facts_company_period_idx
+  on public.earn_edinet_facts (company_code, period_end desc, display_order);

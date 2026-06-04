@@ -307,6 +307,7 @@ const state = {
   companyCode: "toyota",
   resultsByCompany: { ...fallbackResults },
   edinetDocumentsByCompany: {},
+  edinetFactsByCompany: {},
   officialIrDocumentsByCompany: {},
   results: fallbackResults.toyota,
   activeId: fallbackResults.toyota.at(-1).id,
@@ -329,6 +330,7 @@ const elements = {
   profitChartLabel: document.querySelector("#profit-chart-label"),
   marginChartTitle: document.querySelector("#margin-chart-title"),
   documentsBody: document.querySelector("#documents-body"),
+  xbrlFactsBody: document.querySelector("#xbrl-facts-body"),
   toast: document.querySelector("#toast"),
   marginValue: document.querySelector("#margin-value"),
   marginChange: document.querySelector("#margin-change"),
@@ -498,6 +500,38 @@ function renderDocuments() {
       `,
     )
     .join("");
+}
+
+function renderXbrlFacts() {
+  if (!elements.xbrlFactsBody) return;
+  const facts = state.edinetFactsByCompany[state.companyCode];
+  if (!facts) {
+    elements.xbrlFactsBody.innerHTML = '<tr><td colspan="5">Loading saved EDINET XBRL data from DB.</td></tr>';
+    return;
+  }
+  if (!facts.length) {
+    elements.xbrlFactsBody.innerHTML = '<tr><td colspan="5">No saved EDINET XBRL data found in DB.</td></tr>';
+    return;
+  }
+  elements.xbrlFactsBody.innerHTML = facts
+    .map(
+      (fact) => `
+        <tr>
+          <td>${fact.periodEnd ? formatDate(fact.periodEnd) : "-"}</td>
+          <td>${escapeHtml(fact.label)}</td>
+          <td>${escapeHtml(formatXbrlValue(fact))}</td>
+          <td>${escapeHtml(fact.unitRef ?? "-")}</td>
+          <td>${escapeHtml(fact.documentId)}</td>
+        </tr>
+      `,
+    )
+    .join("");
+}
+
+function formatXbrlValue(fact) {
+  const value = Number(fact.value);
+  if (!Number.isFinite(value)) return "-";
+  return value.toLocaleString("ja-JP");
 }
 
 function officialDocumentFiscalYear(document) {
@@ -986,6 +1020,7 @@ function render() {
   renderPicker();
   renderMetrics();
   renderDocuments();
+  renderXbrlFacts();
   renderAnnualFlow();
   renderCharts();
   renderStockChart();
@@ -1112,7 +1147,7 @@ async function loadCachedCompanyData(companyCode, config) {
   addSyncLog("success", "DB読込開始", "保存済みデータと前回取得日時を確認します。", companyCode);
   const baseUrl = `${config.supabaseUrl}/rest/v1`;
   const headers = apiHeaders(config);
-  const [companiesData, resultsData, flowsData, documentsData] = await Promise.all([
+  const [companiesData, resultsData, flowsData, documentsData, factsData] = await Promise.all([
     fetchJsonWithSyncLog(
       `${baseUrl}/earn_companies?code=eq.${companyCode}&select=last_synced_at`,
       { headers },
@@ -1133,6 +1168,11 @@ async function loadCachedCompanyData(companyCode, config) {
       { headers },
       { companyCode, stage: "EDINET書類読込", description: "保存済みEDINET書類" },
     ),
+    fetchJsonWithSyncLog(
+      `${baseUrl}/earn_edinet_facts?company_code=eq.${companyCode}&select=*&order=period_end.desc,display_order.asc&limit=80`,
+      { headers },
+      { companyCode, stage: "EDINET XBRL", description: "saved EDINET XBRL facts" },
+    ),
   ]);
 
   state.lastSyncedAtByCompany[companyCode] = companiesData[0]?.last_synced_at ?? null;
@@ -1142,6 +1182,7 @@ async function loadCachedCompanyData(companyCode, config) {
     ...flowsData[0],
   });
   state.edinetDocumentsByCompany[companyCode] = documentsData.map(normalizeEdinetDocument);
+  state.edinetFactsByCompany[companyCode] = factsData.map(normalizeEdinetFact);
   addSyncLog(
     "success",
     "DB読込完了",
@@ -1201,12 +1242,22 @@ async function syncTodayEdinetDocuments(companyCode, config) {
           body: JSON.stringify(payload.documents),
         });
       }
+      if (!payload.factsPersisted && payload.facts?.length) {
+        await fetchJson(`${config.supabaseUrl}/rest/v1/earn_edinet_facts?on_conflict=id`, {
+          method: "POST",
+          headers: {
+            ...apiHeaders(config),
+            Prefer: "resolution=merge-duplicates,return=minimal",
+          },
+          body: JSON.stringify(payload.facts),
+        });
+      }
       if (payload.persistenceError) {
         addSyncLog("error", "Worker保存 失敗", payload.persistenceError, companyCode);
       }
-      saved += payload.documents?.length ?? 0;
+      saved += payload.facts?.length ?? payload.documents?.length ?? 0;
     }
-    addSyncLog("success", "EDINET同期 完了", `${saved}件の書類をDBへ保存しました。`, companyCode);
+    addSyncLog("success", "EDINET同期 完了", `${saved}件のXBRLデータをDBへ保存しました。`, companyCode);
     await loadCachedCompanyData(companyCode, config);
     return { saved };
   } catch (error) {
@@ -1229,10 +1280,14 @@ async function refreshCompany({ force = false, notify = false } = {}) {
       return;
     }
 
-    await Promise.all([
-      loadCachedCompanyData(companyCode, config),
-      loadOfficialIrDocuments(companyCode),
-    ]);
+    if (force) {
+      await loadCachedCompanyData(companyCode, config);
+    } else {
+      await Promise.all([
+        loadCachedCompanyData(companyCode, config),
+        loadOfficialIrDocuments(companyCode),
+      ]);
+    }
     const payload = force ? await syncTodayEdinetDocuments(companyCode, config) : null;
 
     if (state.companyCode === companyCode) {
@@ -1286,6 +1341,24 @@ function normalizeEdinetDocument(item) {
     periodStart: item.period_start ?? item.periodStart,
     periodEnd: item.period_end ?? item.periodEnd,
     submittedAt: item.submitted_at ?? item.submittedAt,
+  };
+}
+
+function normalizeEdinetFact(item) {
+  return {
+    id: item.id,
+    documentId: item.document_id ?? item.documentId,
+    companyCode: item.company_code ?? item.companyCode,
+    concept: item.concept,
+    label: item.label,
+    value: item.value,
+    unitRef: item.unit_ref ?? item.unitRef,
+    decimals: item.decimals,
+    contextRef: item.context_ref ?? item.contextRef,
+    periodStart: item.period_start ?? item.periodStart,
+    periodEnd: item.period_end ?? item.periodEnd,
+    submittedAt: item.submitted_at ?? item.submittedAt,
+    displayOrder: item.display_order ?? item.displayOrder,
   };
 }
 

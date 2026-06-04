@@ -16,6 +16,34 @@ const edinetDocumentTypes = new Set(["120", "130", "140", "150", "160", "170"]);
 const edinetLegalStatuses = new Set(["1", "2"]);
 const maxEdinetSyncDays = 31;
 const edinetApiBaseUrl = "https://api.edinet-fsa.go.jp/api/v2";
+const xbrlFactDefinitions = [
+  { concept: "NetSales", label: "Net sales", order: 10 },
+  { concept: "NetSalesSummaryOfBusinessResults", label: "Net sales", order: 10 },
+  { concept: "Revenue", label: "Revenue", order: 11 },
+  { concept: "RevenueIFRSSummaryOfBusinessResults", label: "Revenue", order: 11 },
+  { concept: "OperatingRevenue", label: "Operating revenue", order: 12 },
+  { concept: "OperatingIncome", label: "Operating income", order: 20 },
+  { concept: "OperatingIncomeLossSummaryOfBusinessResults", label: "Operating income", order: 20 },
+  { concept: "OperatingProfitLossIFRSSummaryOfBusinessResults", label: "Operating profit", order: 20 },
+  { concept: "ProfitLossBeforeTax", label: "Profit before tax", order: 30 },
+  { concept: "ProfitLossBeforeTaxIFRSSummaryOfBusinessResults", label: "Profit before tax", order: 30 },
+  { concept: "ProfitLoss", label: "Profit or loss", order: 40 },
+  { concept: "ProfitLossSummaryOfBusinessResults", label: "Profit or loss", order: 40 },
+  { concept: "ProfitLossAttributableToOwnersOfParent", label: "Profit attributable to owners of parent", order: 41 },
+  { concept: "ProfitLossAttributableToOwnersOfParentIFRSSummaryOfBusinessResults", label: "Profit attributable to owners of parent", order: 41 },
+  { concept: "NetIncomeLoss", label: "Net income", order: 42 },
+  { concept: "NetIncomeLossSummaryOfBusinessResults", label: "Net income", order: 42 },
+  { concept: "CashAndCashEquivalents", label: "Cash and cash equivalents", order: 50 },
+  { concept: "CashAndCashEquivalentsIFRS", label: "Cash and cash equivalents", order: 50 },
+  { concept: "NetCashProvidedByUsedInOperatingActivities", label: "Operating cash flow", order: 60 },
+  { concept: "NetCashProvidedByUsedInInvestingActivities", label: "Investing cash flow", order: 61 },
+  { concept: "NetCashProvidedByUsedInFinancingActivities", label: "Financing cash flow", order: 62 },
+  { concept: "Assets", label: "Assets", order: 70 },
+  { concept: "AssetsSummaryOfBusinessResults", label: "Assets", order: 70 },
+  { concept: "Liabilities", label: "Liabilities", order: 71 },
+  { concept: "Equity", label: "Equity", order: 72 },
+];
+const xbrlFactDefinitionByConcept = new Map(xbrlFactDefinitions.map((definition) => [definition.concept, definition]));
 const irSources = {
   toyota: {
     sourcePage: "https://global.toyota/jp/ir/financial-results/",
@@ -172,6 +200,147 @@ function filterEdinetDocuments(documents, requestedCompanyCode = null) {
   return [...new Map(filtered.map((document) => [document.id, document])).values()];
 }
 
+async function fetchEdinetXbrlArchive(env, documentId) {
+  const apiKey = env.EDINET_API_KEY ?? config.edinet?.apiKey;
+  if (!apiKey) {
+    throw new Error("EDINET API key is not configured. Set edinet.apiKey in config.json or register EDINET_API_KEY as a Cloudflare Worker secret.");
+  }
+  const response = await fetch(edinetUrl(`/documents/${documentId}`, apiKey, { type: "1" }), {
+    headers: { "User-Agent": "earnings-viewer/1.0" },
+  });
+  const contentType = response.headers.get("Content-Type") ?? "";
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(`Financial Services Agency EDINET XBRL request failed (${response.status}): ${text.slice(0, 500)}`);
+  }
+  if (!contentType.includes("zip") && !contentType.includes("octet-stream")) {
+    const text = await response.text();
+    throw new Error(`Financial Services Agency EDINET XBRL returned an unexpected response: ${text.slice(0, 500)}`);
+  }
+  return response.arrayBuffer();
+}
+
+async function inflateRaw(data) {
+  if (typeof DecompressionStream === "undefined") {
+    throw new Error("This runtime does not support ZIP deflate decompression");
+  }
+  const stream = new Blob([data]).stream().pipeThrough(new DecompressionStream("deflate-raw"));
+  return new Response(stream).arrayBuffer();
+}
+
+function findZipEndOfCentralDirectory(view) {
+  const minimumOffset = Math.max(0, view.byteLength - 65557);
+  for (let offset = view.byteLength - 22; offset >= minimumOffset; offset -= 1) {
+    if (view.getUint32(offset, true) === 0x06054b50) return offset;
+  }
+  throw new Error("EDINET XBRL ZIP central directory was not found");
+}
+
+async function unzipTextFiles(buffer, predicate) {
+  const view = new DataView(buffer);
+  const eocdOffset = findZipEndOfCentralDirectory(view);
+  const entryCount = view.getUint16(eocdOffset + 10, true);
+  let offset = view.getUint32(eocdOffset + 16, true);
+  const decoder = new TextDecoder("utf-8");
+  const files = [];
+
+  for (let index = 0; index < entryCount; index += 1) {
+    if (view.getUint32(offset, true) !== 0x02014b50) break;
+    const method = view.getUint16(offset + 10, true);
+    const compressedSize = view.getUint32(offset + 20, true);
+    const fileNameLength = view.getUint16(offset + 28, true);
+    const extraLength = view.getUint16(offset + 30, true);
+    const commentLength = view.getUint16(offset + 32, true);
+    const localHeaderOffset = view.getUint32(offset + 42, true);
+    const nameBytes = new Uint8Array(buffer, offset + 46, fileNameLength);
+    const name = decoder.decode(nameBytes);
+    offset += 46 + fileNameLength + extraLength + commentLength;
+    if (!predicate(name)) continue;
+
+    const localNameLength = view.getUint16(localHeaderOffset + 26, true);
+    const localExtraLength = view.getUint16(localHeaderOffset + 28, true);
+    const dataOffset = localHeaderOffset + 30 + localNameLength + localExtraLength;
+    const compressed = buffer.slice(dataOffset, dataOffset + compressedSize);
+    const content = method === 0 ? compressed : method === 8 ? await inflateRaw(compressed) : null;
+    if (content) files.push({ name, text: decoder.decode(content) });
+  }
+  return files;
+}
+
+function decodeXml(value) {
+  return value
+    .replaceAll("&amp;", "&")
+    .replaceAll("&quot;", '"')
+    .replaceAll("&apos;", "'")
+    .replaceAll("&lt;", "<")
+    .replaceAll("&gt;", ">");
+}
+
+function parseXbrlContexts(xbrl) {
+  const contexts = new Map();
+  const contextPattern = /<[^<\s:]*:?context\b([^>]*)>([\s\S]*?)<\/[^<\s:]*:?context>/gi;
+  for (const match of xbrl.matchAll(contextPattern)) {
+    const id = match[1].match(/\bid\s*=\s*["']([^"']+)["']/i)?.[1];
+    if (!id) continue;
+    const body = match[2];
+    const startDate = body.match(/<[^<\s:]*:?startDate>\s*([^<]+)\s*<\/[^<\s:]*:?startDate>/i)?.[1] ?? null;
+    const endDate = body.match(/<[^<\s:]*:?endDate>\s*([^<]+)\s*<\/[^<\s:]*:?endDate>/i)?.[1]
+      ?? body.match(/<[^<\s:]*:?instant>\s*([^<]+)\s*<\/[^<\s:]*:?instant>/i)?.[1]
+      ?? null;
+    contexts.set(id, { startDate, endDate });
+  }
+  return contexts;
+}
+
+function parseXbrlFacts(document, xbrl) {
+  const contexts = parseXbrlContexts(xbrl);
+  const factPattern = /<([A-Za-z_][\w.-]*:)?([A-Za-z_][\w.-]*)\b([^>]*)>([^<]+)<\/\1?\2>/g;
+  const facts = [];
+  const seen = new Set();
+  for (const match of xbrl.matchAll(factPattern)) {
+    const definition = xbrlFactDefinitionByConcept.get(match[2]);
+    if (!definition) continue;
+    const attributes = match[3];
+    const valueText = decodeXml(match[4]).trim().replaceAll(",", "");
+    if (!/^-?\d+(?:\.\d+)?$/.test(valueText)) continue;
+    const contextRef = attributes.match(/\bcontextRef\s*=\s*["']([^"']+)["']/i)?.[1] ?? null;
+    const unitRef = attributes.match(/\bunitRef\s*=\s*["']([^"']+)["']/i)?.[1] ?? null;
+    const decimals = attributes.match(/\bdecimals\s*=\s*["']([^"']+)["']/i)?.[1] ?? null;
+    const period = contextRef ? contexts.get(contextRef) : null;
+    const key = `${document.id}:${definition.concept}:${contextRef ?? ""}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    facts.push({
+      id: key,
+      document_id: document.id,
+      company_code: document.company_code,
+      concept: definition.concept,
+      label: definition.label,
+      value: valueText,
+      unit_ref: unitRef,
+      decimals,
+      context_ref: contextRef,
+      period_start: period?.startDate ?? document.period_start ?? null,
+      period_end: period?.endDate ?? document.period_end ?? null,
+      submitted_at: document.submitted_at,
+      display_order: definition.order,
+      synced_at: new Date().toISOString(),
+    });
+  }
+  return facts.sort((a, b) => a.display_order - b.display_order);
+}
+
+async function extractEdinetFacts(env, document) {
+  const archive = await fetchEdinetXbrlArchive(env, document.id);
+  const files = await unzipTextFiles(archive, (name) => (
+    name.toLowerCase().endsWith(".xbrl")
+    && name.includes("/XBRL/PublicDoc/")
+    && !name.toLowerCase().includes("audit")
+  ));
+  const primary = files.find((file) => /jpcrp|jppfs|ifrs/i.test(file.name)) ?? files[0];
+  return primary ? parseXbrlFacts(document, primary.text).slice(0, 80) : [];
+}
+
 async function saveEdinetDocuments(env, documents) {
   if (!documents.length) return true;
   if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY) {
@@ -190,6 +359,28 @@ async function saveEdinetDocuments(env, documents) {
   if (!response.ok) {
     const detail = await response.text();
     throw new Error(`Supabase EDINET document save failed (${response.status}): ${detail.slice(0, 500)}`);
+  }
+  return true;
+}
+
+async function saveEdinetFacts(env, facts) {
+  if (!facts.length) return true;
+  if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY) {
+    return false;
+  }
+  const response = await fetch(`${env.SUPABASE_URL}/rest/v1/earn_edinet_facts?on_conflict=id`, {
+    method: "POST",
+    headers: {
+      apikey: env.SUPABASE_SERVICE_ROLE_KEY,
+      Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+      "Content-Type": "application/json",
+      Prefer: "resolution=merge-duplicates,return=minimal",
+    },
+    body: JSON.stringify(facts),
+  });
+  if (!response.ok) {
+    const detail = await response.text();
+    throw new Error(`Supabase EDINET XBRL fact save failed (${response.status}): ${detail.slice(0, 500)}`);
   }
   return true;
 }
@@ -220,14 +411,39 @@ async function syncEdinetDocuments(request, env) {
       documents: [],
     });
   }
+  const facts = [];
+  const xbrlErrors = [];
+  for (const document of documents) {
+    try {
+      facts.push(...await extractEdinetFacts(env, document));
+    } catch (error) {
+      xbrlErrors.push({
+        documentId: document.id,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
   let persisted = false;
+  let factsPersisted = false;
   let persistenceError = null;
   try {
     persisted = await saveEdinetDocuments(env, documents);
+    factsPersisted = await saveEdinetFacts(env, facts);
   } catch (error) {
     persistenceError = error instanceof Error ? error.message : String(error);
   }
-  return Response.json({ dates, saved: persisted ? documents.length : 0, persisted, persistenceError, documents });
+  return Response.json({
+    dates,
+    saved: persisted ? documents.length : 0,
+    factsSaved: factsPersisted ? facts.length : 0,
+    persisted,
+    factsPersisted,
+    persistenceError,
+    xbrlErrors,
+    documents,
+    facts,
+  });
 }
 
 async function fetchCompanyEdinetDocuments(request, env, companyCode) {
@@ -368,6 +584,16 @@ export default {
     const date = jstDate();
     const documents = filterEdinetDocuments(await fetchEdinetDocumentList(env, date));
     const persisted = await saveEdinetDocuments(env, documents);
+    const facts = [];
+    for (const document of documents) {
+      try {
+        facts.push(...await extractEdinetFacts(env, document));
+      } catch {
+        // Keep the scheduled metadata sync alive even when an individual XBRL package is unavailable.
+      }
+    }
+    const factsPersisted = await saveEdinetFacts(env, facts);
     if (!persisted) throw new Error("SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY is not configured");
+    if (!factsPersisted) throw new Error("SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY is not configured");
   },
 };
