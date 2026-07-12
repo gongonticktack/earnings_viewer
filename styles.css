@@ -138,8 +138,8 @@ body::after {
 
 .company-switcher {
   display: grid;
-  margin-top: 52px;
-  gap: 6px;
+  margin-top: 34px;
+  gap: 3px;
 }
 
 .sidebar-label {
@@ -152,7 +152,7 @@ body::after {
 .company-button {
   display: flex;
   align-items: center;
-  padding: 9px 10px;
+  padding: 7px 9px;
   border: 1px solid transparent;
   border-radius: 7px;
   color: var(--muted);
@@ -170,7 +170,8 @@ body::after {
   background: rgba(205, 177, 122, 0.09);
 }
 
-.company-monogram {
+.company-monogram,
+.company-rank {
   display: grid;
   width: 24px;
   height: 24px;
@@ -179,6 +180,12 @@ body::after {
   color: var(--gold);
   font: 800 10px/1 var(--font-display);
   place-items: center;
+}
+
+.company-rank {
+  flex: 0 0 24px;
+  color: var(--gold-soft);
+  font-size: 8px;
 }
 
 .company-button strong,
@@ -411,6 +418,7 @@ select {
 
 .year-field select {
   border: 1px solid rgba(130, 186, 142, 0.42);
+  color: var(--green);
   background: rgba(130, 186, 142, 0.07);
 }
 
@@ -420,6 +428,7 @@ select {
 
 .quarter-field select {
   border: 1px solid rgba(214, 183, 122, 0.42);
+  color: var(--gold);
   background: rgba(214, 183, 122, 0.07);
 }
 
@@ -455,6 +464,10 @@ select {
 .quarter-data .metric-card,
 .quarter-data > .panel {
   border-top-color: rgba(214, 183, 122, 0.34);
+}
+
+.quarter-data .metric-heading span:first-child {
+  color: var(--gold-soft);
 }
 
 .metric-grid {
@@ -955,6 +968,12 @@ tbody tr.selected {
   .company-switcher {
     display: flex;
     margin-top: 15px;
+    padding-bottom: 6px;
+    overflow-x: auto;
+  }
+
+  .company-button {
+    flex: 0 0 auto;
   }
 
   .sidebar-bottom {

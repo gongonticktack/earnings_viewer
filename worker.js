@@ -1,8 +1,12 @@
 import config from "./config.json";
 
-const stockSymbols = new Set(["7203.T", "9432.T", "9434.T", "9984.T", "8306.T", "9983.T", "6501.T", "8316.T"]);
+const stockSymbols = new Set([
+  "285A.T", "7203.T", "8306.T", "9984.T", "8035.T", "9983.T", "8316.T", "6857.T", "6501.T", "8411.T",
+  "6758.T", "6981.T", "6861.T", "6098.T", "8058.T", "8001.T", "8766.T", "4063.T", "9432.T", "8031.T",
+]);
 
 const edinetCompanies = {
+  kioxia: "285A",
   toyota: "7203",
   ntt: "9432",
   "softbank-group": "9984",
@@ -10,6 +14,18 @@ const edinetCompanies = {
   "fast-retailing": "9983",
   hitachi: "6501",
   smfg: "8316",
+  "tokyo-electron": "8035",
+  advantest: "6857",
+  mizuho: "8411",
+  sony: "6758",
+  murata: "6981",
+  keyence: "6861",
+  recruit: "6098",
+  "mitsubishi-corp": "8058",
+  itochu: "8001",
+  "tokio-marine": "8766",
+  "shin-etsu": "4063",
+  mitsui: "8031",
 };
 
 const edinetDocumentTypes = new Set(["120", "130", "140", "150", "160", "170"]);
@@ -45,6 +61,10 @@ const xbrlFactDefinitions = [
 ];
 const xbrlFactDefinitionByConcept = new Map(xbrlFactDefinitions.map((definition) => [definition.concept, definition]));
 const irSources = {
+  kioxia: {
+    sourcePage: "https://www.kioxia-holdings.com/ja-jp/ir/library/data.html",
+    allowedDomains: ["kioxia-holdings.com"], includePatterns: [/決算短信|financial results/i],
+  },
   toyota: {
     sourcePage: "https://global.toyota/jp/ir/financial-results/",
     allowedDomains: ["global.toyota"],
@@ -86,6 +106,54 @@ const irSources = {
     allowedDomains: ["smfg.co.jp"],
     includePatterns: [/決算短信|financial results|summary of consolidated financial results/i],
     urlPatterns: [/\/investor\/financial\/latest_statement\/\d{4}_3\/\d{4}_(?:[1-3]q|fy)_01\.pdf$/i],
+  },
+  "tokyo-electron": {
+    sourcePage: "https://www.tel.co.jp/ir/", allowedDomains: ["tel.co.jp"],
+    includePatterns: [/決算短信|financial results/i],
+  },
+  advantest: {
+    sourcePage: "https://www.advantest.com/ja/investors/ir-library/result/", allowedDomains: ["advantest.com"],
+    includePatterns: [/決算短信|financial results/i],
+  },
+  mizuho: {
+    sourcePage: "https://www.mizuho-fg.co.jp/investors/financial/tanshin/index.html", allowedDomains: ["mizuho-fg.co.jp"],
+    includePatterns: [/決算短信|financial results/i],
+  },
+  sony: {
+    sourcePage: "https://www.sony.com/ja/SonyInfo/IR/library/presen/er/", allowedDomains: ["sony.com"],
+    includePatterns: [/決算短信|業績説明|financial results|earnings release/i],
+  },
+  murata: {
+    sourcePage: "https://corporate.murata.com/ja-jp/ir/library/results", allowedDomains: ["murata.com"],
+    includePatterns: [/決算短信|financial results/i],
+  },
+  keyence: {
+    sourcePage: "https://www.keyence.co.jp/investor/", allowedDomains: ["keyence.co.jp"],
+    includePatterns: [/決算短信|financial results/i],
+  },
+  recruit: {
+    sourcePage: "https://recruit-holdings.com/ja/ir/financials/", allowedDomains: ["recruit-holdings.com"],
+    includePatterns: [/決算短信|financial results|earnings/i],
+  },
+  "mitsubishi-corp": {
+    sourcePage: "https://www.mitsubishicorp.com/jp/ja/ir/library/earnings/", allowedDomains: ["mitsubishicorp.com"],
+    includePatterns: [/決算短信|financial results/i],
+  },
+  itochu: {
+    sourcePage: "https://www.itochu.co.jp/ja/ir/financial_statements/", allowedDomains: ["itochu.co.jp"],
+    includePatterns: [/決算短信|financial results/i],
+  },
+  "tokio-marine": {
+    sourcePage: "https://www.tokiomarinehd.com/ir/financial/", allowedDomains: ["tokiomarinehd.com"],
+    includePatterns: [/決算短信|financial results/i],
+  },
+  "shin-etsu": {
+    sourcePage: "https://www.shinetsu.co.jp/jp/ir/ir-data/", allowedDomains: ["shinetsu.co.jp"],
+    includePatterns: [/決算短信|financial results/i],
+  },
+  mitsui: {
+    sourcePage: "https://www.mitsui.com/jp/ja/ir/library/meeting/index.html", allowedDomains: ["mitsui.com"],
+    includePatterns: [/決算短信|financial results/i],
   },
 };
 

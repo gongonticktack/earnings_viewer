@@ -1,12 +1,20 @@
 import "./config.js";
 
 const companies = {
+  kioxia: {
+    code: "kioxia", name: "KIOXIA HOLDINGS CORPORATION", sourceName: "KIOXIA IR",
+    sourcePage: "https://www.kioxia-holdings.com/ja-jp/ir/library/data.html", stockSymbol: "285A.T",
+  },
   toyota: {
     code: "toyota",
     name: "TOYOTA MOTOR CORPORATION",
     sourceName: "TOYOTA IR",
     sourcePage: "https://global.toyota/jp/ir/financial-results/",
     stockSymbol: "7203.T",
+  },
+  "tokyo-electron": {
+    code: "tokyo-electron", name: "TOKYO ELECTRON LIMITED", sourceName: "TOKYO ELECTRON IR",
+    sourcePage: "https://www.tel.co.jp/ir/", stockSymbol: "8035.T",
   },
   ntt: {
     code: "ntt",
@@ -50,10 +58,55 @@ const companies = {
     sourcePage: "https://www.smfg.co.jp/investor/financial/latest_statement.html",
     stockSymbol: "8316.T",
   },
+  advantest: {
+    code: "advantest", name: "ADVANTEST CORPORATION", sourceName: "ADVANTEST IR",
+    sourcePage: "https://www.advantest.com/ja/investors/ir-library/result/", stockSymbol: "6857.T",
+  },
+  mizuho: {
+    code: "mizuho", name: "MIZUHO FINANCIAL GROUP, INC.", sourceName: "MIZUHO FG IR",
+    sourcePage: "https://www.mizuho-fg.co.jp/investors/financial/tanshin/index.html", stockSymbol: "8411.T",
+  },
+  sony: {
+    code: "sony", name: "SONY GROUP CORPORATION", sourceName: "SONY GROUP IR",
+    sourcePage: "https://www.sony.com/ja/SonyInfo/IR/library/presen/er/", stockSymbol: "6758.T",
+  },
+  murata: {
+    code: "murata", name: "MURATA MANUFACTURING CO., LTD.", sourceName: "MURATA IR",
+    sourcePage: "https://corporate.murata.com/ja-jp/ir/library/results", stockSymbol: "6981.T",
+  },
+  keyence: {
+    code: "keyence", name: "KEYENCE CORPORATION", sourceName: "KEYENCE IR",
+    sourcePage: "https://www.keyence.co.jp/investor/", stockSymbol: "6861.T",
+  },
+  recruit: {
+    code: "recruit", name: "RECRUIT HOLDINGS CO., LTD.", sourceName: "RECRUIT HOLDINGS IR",
+    sourcePage: "https://recruit-holdings.com/ja/ir/financials/", stockSymbol: "6098.T",
+  },
+  "mitsubishi-corp": {
+    code: "mitsubishi-corp", name: "MITSUBISHI CORPORATION", sourceName: "MITSUBISHI CORP. IR",
+    sourcePage: "https://www.mitsubishicorp.com/jp/ja/ir/library/earnings/", stockSymbol: "8058.T",
+  },
+  itochu: {
+    code: "itochu", name: "ITOCHU CORPORATION", sourceName: "ITOCHU IR",
+    sourcePage: "https://www.itochu.co.jp/ja/ir/financial_statements/", stockSymbol: "8001.T",
+  },
+  "tokio-marine": {
+    code: "tokio-marine", name: "TOKIO MARINE HOLDINGS, INC.", sourceName: "TOKIO MARINE IR",
+    sourcePage: "https://www.tokiomarinehd.com/ir/financial/", stockSymbol: "8766.T",
+  },
+  "shin-etsu": {
+    code: "shin-etsu", name: "SHIN-ETSU CHEMICAL CO., LTD.", sourceName: "SHIN-ETSU CHEMICAL IR",
+    sourcePage: "https://www.shinetsu.co.jp/jp/ir/ir-data/", stockSymbol: "4063.T",
+  },
+  mitsui: {
+    code: "mitsui", name: "MITSUI & CO., LTD.", sourceName: "MITSUI & CO. IR",
+    sourcePage: "https://www.mitsui.com/jp/ja/ir/library/meeting/index.html", stockSymbol: "8031.T",
+  },
 };
 
 // Official PDFs publish cumulative values. Each entry below is normalized to a standalone quarter.
 const fallbackResults = {
+  kioxia: [],
   toyota: [
   {
     id: "fy2025-q1", fiscalYear: 2025, quarter: 1, periodEnd: "2024-06-30",
@@ -237,6 +290,18 @@ const fallbackResults = {
   "fast-retailing": [],
   hitachi: [],
   smfg: [],
+  "tokyo-electron": [],
+  advantest: [],
+  mizuho: [],
+  sony: [],
+  murata: [],
+  keyence: [],
+  recruit: [],
+  "mitsubishi-corp": [],
+  itochu: [],
+  "tokio-marine": [],
+  "shin-etsu": [],
+  mitsui: [],
 };
 
 const registeredDataDescription = "公式IR資料をもとにJSへ登録済みのデータ（リアルタイム自動取得ではありません）";
