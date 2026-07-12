@@ -95,25 +95,24 @@
               公式IR資料から取得した四半期ごとの業績を、単独期間ベースで可視化します。
             </p>
           </div>
-          <div class="quarter-picker">
-            <label for="quarter-select">対象四半期</label>
-            <div class="select-wrap">
-              <select id="quarter-select" aria-label="対象四半期"></select>
+          <div class="period-picker">
+            <div class="period-field year-field">
+              <label for="year-select">年度</label>
+              <div class="select-wrap">
+                <select id="year-select" aria-label="対象年度"></select>
+              </div>
+            </div>
+            <div class="period-field quarter-field">
+              <label for="quarter-select">四半期</label>
+              <div class="select-wrap">
+                <select id="quarter-select" aria-label="対象四半期"></select>
+              </div>
             </div>
             <small id="period-caption">決算期間 —</small>
           </div>
         </section>
 
-        <div class="data-scope-banner quarterly-scope" aria-label="四半期データの範囲">
-          <span class="scope-badge">3 MONTHS</span>
-          <div class="scope-copy">
-            <strong>四半期データ</strong>
-            <span>主要指標は上で選択した1四半期、グラフは四半期ごとの推移です。</span>
-          </div>
-          <span class="scope-period" id="quarterly-scope-period">—</span>
-        </div>
-
-        <section class="metric-grid" aria-label="主要業績指標">
+        <section class="metric-grid quarter-data" aria-label="主要業績指標">
           <article class="metric-card accent">
             <div class="metric-heading">
               <span>Revenue</span>
@@ -160,7 +159,7 @@
           </article>
         </section>
 
-        <section class="chart-grid" id="quarterly">
+        <section class="chart-grid quarter-data" id="quarterly">
           <article class="panel performance-panel">
             <div class="panel-heading">
               <div>
@@ -194,16 +193,7 @@
           </article>
         </section>
 
-        <div class="data-scope-banner annual-scope" aria-label="通期データの範囲">
-          <span class="scope-badge">12 MONTHS</span>
-          <div class="scope-copy">
-            <strong>ここから通期データ</strong>
-            <span>How Cash Moved は1年間の集計です。上の四半期選択には連動しません。</span>
-          </div>
-          <span class="scope-period" id="annual-scope-period">—</span>
-        </div>
-
-        <section class="panel annual-flow-panel" id="annual-flow">
+        <section class="panel annual-flow-panel year-data" id="annual-flow">
           <div class="panel-heading">
             <div>
               <p class="eyebrow">CASH FLOW BREAKDOWN</p>

@@ -319,6 +319,7 @@ const state = {
 };
 
 const elements = {
+  yearSelect: document.querySelector("#year-select"),
   quarterSelect: document.querySelector("#quarter-select"),
   periodCaption: document.querySelector("#period-caption"),
   latestUpdate: document.querySelector("#latest-update"),
@@ -339,8 +340,6 @@ const elements = {
   irLink: document.querySelector("#ir-link"),
   companyButtons: document.querySelectorAll(".company-button"),
   flowPeriod: document.querySelector("#flow-period"),
-  quarterlyScopePeriod: document.querySelector("#quarterly-scope-period"),
-  annualScopePeriod: document.querySelector("#annual-scope-period"),
   previousCashAndCashEquivalents: document.querySelector("#previous-cash-and-cash-equivalents"),
   annualRevenue: document.querySelector("#annual-revenue"),
   annualOperatingCost: document.querySelector("#annual-operating-cost"),
@@ -411,6 +410,18 @@ function activeResult() {
   return state.results.find((item) => item.id === state.activeId) ?? state.results.at(-1);
 }
 
+function activeYearResults() {
+  const year = activeResult()?.fiscalYear;
+  return year ? state.results.filter((item) => item.fiscalYear === year) : [];
+}
+
+function activeAnnualAnalysis() {
+  const analysis = annualAnalyses[state.companyCode];
+  const year = activeResult()?.fiscalYear;
+  const analysisYear = Number(String(analysis?.currentFiscalYear ?? "").match(/\d{4}/)?.[0]);
+  return analysis && (!year || analysisYear === year) ? analysis : null;
+}
+
 function previousResult(result) {
   if (!result) return null;
   const currentIndex = state.results.findIndex((item) => item.id === result.id);
@@ -418,14 +429,25 @@ function previousResult(result) {
 }
 
 function renderPicker() {
-  elements.quarterSelect.innerHTML = state.results
+  const years = [...new Set(state.results.map((result) => result.fiscalYear))].sort((a, b) => b - a);
+  const current = activeResult();
+  const selectedYear = current?.fiscalYear ?? years[0];
+  const quarters = state.results.filter((result) => result.fiscalYear === selectedYear);
+
+  elements.yearSelect.innerHTML = years
+    .map((year) => `<option value="${year}">${year}年度</option>`)
+    .join("");
+  elements.yearSelect.value = selectedYear ?? "";
+  elements.yearSelect.disabled = !years.length;
+
+  elements.quarterSelect.innerHTML = quarters
     .map(
       (result) =>
-        `<option value="${result.id}">${quarterLabel(result)} — ${formatDate(result.periodEnd)}</option>`,
+        `<option value="${result.id}">${result.quarter}Q — ${formatDate(result.periodEnd)}</option>`,
     )
     .join("");
   elements.quarterSelect.value = state.activeId;
-  elements.quarterSelect.disabled = !state.results.length;
+  elements.quarterSelect.disabled = !quarters.length;
 }
 
 function profitValue(result) {
@@ -442,7 +464,6 @@ function renderMetrics() {
   elements.marginChartTitle.textContent = usesPretaxIncome ? "Pretax Margin" : "Operating Margin";
   if (!current) {
     elements.periodCaption.textContent = "決算データ未登録";
-    elements.quarterlyScopePeriod.textContent = "未選択";
     metricIds.forEach((metric) => {
       document.querySelector(`#metric-${metric}`).textContent = "—";
       document.querySelector(`#change-${metric}`).textContent = "PENDING";
@@ -454,7 +475,6 @@ function renderMetrics() {
   }
   const previous = previousResult(current);
   elements.periodCaption.textContent = `発行年月日 ${formatDate(current.periodEnd)}`;
-  elements.quarterlyScopePeriod.textContent = `${quarterLabel(current)} を表示中`;
 
   metricIds.forEach((metric) => {
     const key = metric === "operating" && usesPretaxIncome ? "pretaxIncome" : metricKey[metric];
@@ -608,7 +628,8 @@ function clampedTextX(ctx, text, x, minX, maxX) {
 
 function drawPerformanceChart() {
   const canvas = document.querySelector("#performance-chart");
-  if (!state.results.length) {
+  const results = activeYearResults();
+  if (!results.length) {
     drawEmptyChart(canvas);
     return;
   }
@@ -616,11 +637,11 @@ function drawPerformanceChart() {
   const padding = { top: 10, right: 22, bottom: 31, left: 9 };
   const chartWidth = width - padding.left - padding.right;
   const chartHeight = height - padding.top - padding.bottom;
-  const maxRevenue = Math.max(...state.results.map((item) => item.revenue)) * 1.12;
-  const maxProfit = Math.max(...state.results.map(profitValue)) * 1.28;
-  const gap = chartWidth / state.results.length;
+  const maxRevenue = Math.max(...results.map((item) => item.revenue)) * 1.12;
+  const maxProfit = Math.max(...results.map(profitValue)) * 1.28;
+  const gap = chartWidth / results.length;
   const barWidth = Math.min(47, gap * 0.38);
-  const visibleLabelIndexes = labelIndexesForWidth(state.results.length, chartWidth, 64);
+  const visibleLabelIndexes = labelIndexesForWidth(results.length, chartWidth, 64);
 
   ctx.clearRect(0, 0, width, height);
   ctx.font = '600 9px "Manrope"';
@@ -637,7 +658,7 @@ function drawPerformanceChart() {
   }
 
   const points = [];
-  state.results.forEach((result, index) => {
+  results.forEach((result, index) => {
     const x = padding.left + gap * index + gap / 2;
     const barHeight = (result.revenue / maxRevenue) * chartHeight;
     const y = padding.top + chartHeight - barHeight;
@@ -681,7 +702,8 @@ function drawPerformanceChart() {
 
 function drawMarginChart() {
   const canvas = document.querySelector("#margin-chart");
-  if (!state.results.length) {
+  const results = activeYearResults();
+  if (!results.length) {
     drawEmptyChart(canvas);
     return;
   }
@@ -689,11 +711,11 @@ function drawMarginChart() {
   const padding = { top: 12, right: 10, bottom: 29, left: 10 };
   const chartWidth = width - padding.left - padding.right;
   const chartHeight = height - padding.top - padding.bottom;
-  const margins = state.results.map((item) => (profitValue(item) / item.revenue) * 100);
+  const margins = results.map((item) => (profitValue(item) / item.revenue) * 100);
   const max = Math.max(...margins) * 1.14;
   const visibleLabelIndexes = labelIndexesForWidth(margins.length, chartWidth, 66);
   const points = margins.map((margin, index) => ({
-    x: padding.left + (chartWidth / (margins.length - 1)) * index,
+    x: margins.length === 1 ? padding.left + chartWidth / 2 : padding.left + (chartWidth / (margins.length - 1)) * index,
     y: padding.top + chartHeight - (margin / max) * chartHeight,
   }));
 
@@ -739,7 +761,7 @@ function drawMarginChart() {
     ctx.textAlign = "center";
     ctx.font = '600 9px "Manrope"';
     if (visibleLabelIndexes.has(index)) {
-      const label = chartQuarterLabel(state.results[index]);
+      const label = chartQuarterLabel(results[index]);
       ctx.fillText(label, clampedTextX(ctx, label, point.x, padding.left, width - padding.right), height - 7);
     }
   });
@@ -747,7 +769,7 @@ function drawMarginChart() {
 
 function drawWaterfallChart() {
   const canvas = document.querySelector("#waterfall-chart");
-  const analysis = annualAnalyses[state.companyCode];
+  const analysis = activeAnnualAnalysis();
   if (!analysis) {
     drawEmptyChart(canvas, "年次キャッシュフロー未登録");
     return;
@@ -881,10 +903,10 @@ function calculateProfitCashAdjustment(analysis) {
 }
 
 function renderAnnualFlow() {
-  const analysis = annualAnalyses[state.companyCode];
+  const analysis = activeAnnualAnalysis();
   if (!analysis) {
-    elements.flowPeriod.textContent = "PENDING";
-    elements.annualScopePeriod.textContent = "未登録";
+    const year = activeResult()?.fiscalYear;
+    elements.flowPeriod.textContent = year ? `FY${year}` : "PENDING";
     [
       elements.previousCashAndCashEquivalents,
       elements.annualRevenue,
@@ -899,7 +921,6 @@ function renderAnnualFlow() {
     return;
   }
   elements.flowPeriod.textContent = analysis.currentFiscalYear;
-  elements.annualScopePeriod.textContent = `${analysis.currentFiscalYear} 通期`;
   elements.previousCashAndCashEquivalents.textContent = formatOptionalBillions(analysis.previousCashAndCashEquivalents);
   elements.annualRevenue.textContent = formatOptionalBillions(analysis.currentRevenue);
   elements.annualOperatingCost.textContent = formatOptionalBillions(-analysis.currentOperatingCost);
@@ -1388,6 +1409,16 @@ function normalizeAnnualFlow(item) {
   };
 }
 
+elements.yearSelect.addEventListener("change", (event) => {
+  const selectedYear = Number(event.target.value);
+  const latestQuarter = state.results.filter((result) => result.fiscalYear === selectedYear).at(-1);
+  state.activeId = latestQuarter?.id ?? null;
+  renderPicker();
+  renderMetrics();
+  renderDocuments();
+  renderAnnualFlow();
+  renderCharts();
+});
 elements.quarterSelect.addEventListener("change", (event) => {
   state.activeId = event.target.value;
   renderMetrics();

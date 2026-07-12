@@ -378,23 +378,24 @@ select {
   font-size: 12px;
 }
 
-.quarter-picker {
-  min-width: 200px;
+.period-picker {
+  display: grid;
+  min-width: 360px;
+  gap: 8px 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
-.quarter-picker label {
+.period-field label {
   display: block;
   margin-bottom: 8px;
-  color: var(--gold-soft);
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.08em;
 }
 
-.quarter-picker select {
+.period-field select {
   width: 100%;
   padding: 11px 36px 11px 12px;
-  border: 1px solid var(--line-strong);
   border-radius: 5px;
   outline: none;
   appearance: none;
@@ -402,6 +403,24 @@ select {
   background: rgba(10, 10, 9, 0.55);
   cursor: pointer;
   font-size: 12px;
+}
+
+.year-field label {
+  color: var(--green);
+}
+
+.year-field select {
+  border: 1px solid rgba(130, 186, 142, 0.42);
+  background: rgba(130, 186, 142, 0.07);
+}
+
+.quarter-field label {
+  color: var(--gold);
+}
+
+.quarter-field select {
+  border: 1px solid rgba(214, 183, 122, 0.42);
+  background: rgba(214, 183, 122, 0.07);
 }
 
 .select-wrap {
@@ -418,71 +437,24 @@ select {
   transform: translateY(-65%);
 }
 
-.quarter-picker small {
+.year-field .select-wrap::after {
+  color: var(--green);
+}
+
+.quarter-field .select-wrap::after {
+  color: var(--gold);
+}
+
+.period-picker small {
   display: block;
-  margin-top: 8px;
   color: var(--dim);
   font-size: 9px;
+  grid-column: 1 / -1;
 }
 
-.data-scope-banner {
-  display: grid;
-  align-items: center;
-  margin-top: 17px;
-  padding: 12px 15px;
-  border: 1px solid rgba(214, 183, 122, 0.2);
-  border-radius: 7px;
-  gap: 13px;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  background: linear-gradient(90deg, rgba(214, 183, 122, 0.1), rgba(214, 183, 122, 0.025));
-}
-
-.scope-badge {
-  padding: 6px 8px;
-  border-radius: 4px;
-  color: #17130d;
-  background: var(--gold);
-  font: 800 8px/1 var(--font-display);
-  letter-spacing: 0.12em;
-}
-
-.scope-copy {
-  display: flex;
-  align-items: baseline;
-  min-width: 0;
-  gap: 12px;
-}
-
-.scope-copy strong {
-  flex: none;
-  font: 700 12px/1.4 var(--font-display);
-}
-
-.scope-copy span {
-  color: var(--muted);
-  font-size: 10px;
-  line-height: 1.6;
-}
-
-.scope-period {
-  color: var(--gold);
-  font: 700 10px/1 var(--font-display);
-  letter-spacing: 0.04em;
-  white-space: nowrap;
-}
-
-.annual-scope {
-  margin-top: 27px;
-  border-color: rgba(130, 186, 142, 0.26);
-  background: linear-gradient(90deg, rgba(130, 186, 142, 0.11), rgba(130, 186, 142, 0.025));
-}
-
-.annual-scope .scope-badge {
-  background: var(--green);
-}
-
-.annual-scope .scope-period {
-  color: var(--green);
+.quarter-data .metric-card,
+.quarter-data > .panel {
+  border-top-color: rgba(214, 183, 122, 0.34);
 }
 
 .metric-grid {
@@ -741,7 +713,16 @@ select {
 }
 
 .annual-flow-panel {
-  margin-top: 10px;
+  margin-top: 27px;
+}
+
+.year-data {
+  border-top-color: rgba(130, 186, 142, 0.45);
+}
+
+.year-data .eyebrow,
+.year-data .flow-period {
+  color: var(--green);
 }
 
 .panel-description,
@@ -1015,23 +996,9 @@ tbody tr.selected {
     line-height: 1.8;
   }
 
-  .quarter-picker {
+  .period-picker {
+    min-width: 0;
     margin-top: 21px;
-  }
-
-  .data-scope-banner {
-    align-items: start;
-    gap: 8px 10px;
-    grid-template-columns: auto 1fr;
-  }
-
-  .scope-copy {
-    display: grid;
-    gap: 3px;
-  }
-
-  .scope-period {
-    grid-column: 2;
   }
 
   .metric-grid {
