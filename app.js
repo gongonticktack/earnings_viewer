@@ -339,6 +339,8 @@ const elements = {
   irLink: document.querySelector("#ir-link"),
   companyButtons: document.querySelectorAll(".company-button"),
   flowPeriod: document.querySelector("#flow-period"),
+  quarterlyScopePeriod: document.querySelector("#quarterly-scope-period"),
+  annualScopePeriod: document.querySelector("#annual-scope-period"),
   previousCashAndCashEquivalents: document.querySelector("#previous-cash-and-cash-equivalents"),
   annualRevenue: document.querySelector("#annual-revenue"),
   annualOperatingCost: document.querySelector("#annual-operating-cost"),
@@ -440,6 +442,7 @@ function renderMetrics() {
   elements.marginChartTitle.textContent = usesPretaxIncome ? "Pretax Margin" : "Operating Margin";
   if (!current) {
     elements.periodCaption.textContent = "決算データ未登録";
+    elements.quarterlyScopePeriod.textContent = "未選択";
     metricIds.forEach((metric) => {
       document.querySelector(`#metric-${metric}`).textContent = "—";
       document.querySelector(`#change-${metric}`).textContent = "PENDING";
@@ -451,6 +454,7 @@ function renderMetrics() {
   }
   const previous = previousResult(current);
   elements.periodCaption.textContent = `発行年月日 ${formatDate(current.periodEnd)}`;
+  elements.quarterlyScopePeriod.textContent = `${quarterLabel(current)} を表示中`;
 
   metricIds.forEach((metric) => {
     const key = metric === "operating" && usesPretaxIncome ? "pretaxIncome" : metricKey[metric];
@@ -880,6 +884,7 @@ function renderAnnualFlow() {
   const analysis = annualAnalyses[state.companyCode];
   if (!analysis) {
     elements.flowPeriod.textContent = "PENDING";
+    elements.annualScopePeriod.textContent = "未登録";
     [
       elements.previousCashAndCashEquivalents,
       elements.annualRevenue,
@@ -894,6 +899,7 @@ function renderAnnualFlow() {
     return;
   }
   elements.flowPeriod.textContent = analysis.currentFiscalYear;
+  elements.annualScopePeriod.textContent = `${analysis.currentFiscalYear} 通期`;
   elements.previousCashAndCashEquivalents.textContent = formatOptionalBillions(analysis.previousCashAndCashEquivalents);
   elements.annualRevenue.textContent = formatOptionalBillions(analysis.currentRevenue);
   elements.annualOperatingCost.textContent = formatOptionalBillions(-analysis.currentOperatingCost);

@@ -61,24 +61,6 @@
           </button>
         </section>
 
-        <nav class="side-nav" aria-label="メインナビゲーション">
-          <a class="nav-item active" href="#overview">
-            <span class="nav-icon">⌂</span> Overview
-          </a>
-          <a class="nav-item" href="#quarterly">
-            <span class="nav-icon">◒</span> Quarterly
-          </a>
-          <a class="nav-item" href="#annual-flow">
-            <span class="nav-icon">↝</span> Annual Flow
-          </a>
-          <a class="nav-item" href="#stock-price">
-            <span class="nav-icon">↗</span> Weekly Stock
-          </a>
-          <a class="nav-item" href="#documents">
-            <span class="nav-icon">▤</span> Documents
-          </a>
-        </nav>
-
         <div class="sidebar-bottom">
           <div class="source-card">
             <span class="status-dot"></span>
@@ -87,7 +69,6 @@
               <strong id="source-name">TOYOTA IR</strong>
             </div>
           </div>
-          <p>Official financial results<br />collection workspace.</p>
         </div>
       </aside>
 
@@ -122,6 +103,15 @@
             <small id="period-caption">決算期間 —</small>
           </div>
         </section>
+
+        <div class="data-scope-banner quarterly-scope" aria-label="四半期データの範囲">
+          <span class="scope-badge">3 MONTHS</span>
+          <div class="scope-copy">
+            <strong>四半期データ</strong>
+            <span>主要指標は上で選択した1四半期、グラフは四半期ごとの推移です。</span>
+          </div>
+          <span class="scope-period" id="quarterly-scope-period">—</span>
+        </div>
 
         <section class="metric-grid" aria-label="主要業績指標">
           <article class="metric-card accent">
@@ -203,6 +193,15 @@
             </div>
           </article>
         </section>
+
+        <div class="data-scope-banner annual-scope" aria-label="通期データの範囲">
+          <span class="scope-badge">12 MONTHS</span>
+          <div class="scope-copy">
+            <strong>ここから通期データ</strong>
+            <span>How Cash Moved は1年間の集計です。上の四半期選択には連動しません。</span>
+          </div>
+          <span class="scope-period" id="annual-scope-period">—</span>
+        </div>
 
         <section class="panel annual-flow-panel" id="annual-flow">
           <div class="panel-heading">

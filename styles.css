@@ -198,40 +198,6 @@ body::after {
   font-size: 8px;
 }
 
-.side-nav {
-  display: grid;
-  margin-top: 30px;
-  gap: 6px;
-}
-
-.nav-item {
-  display: flex;
-  align-items: center;
-  padding: 11px 12px;
-  border: 1px solid transparent;
-  border-radius: 7px;
-  color: var(--muted);
-  font: 600 12px/1 var(--font-display);
-  gap: 12px;
-  letter-spacing: 0.04em;
-  text-decoration: none;
-  transition: 180ms ease;
-}
-
-.nav-item:hover,
-.nav-item.active {
-  border-color: var(--line);
-  color: var(--text);
-  background: rgba(205, 177, 122, 0.09);
-}
-
-.nav-icon {
-  width: 16px;
-  color: var(--gold);
-  font-size: 16px;
-  text-align: center;
-}
-
 .sidebar-bottom {
   margin-top: auto;
 }
@@ -270,13 +236,6 @@ body::after {
   margin-top: 4px;
   color: var(--muted);
   font-size: 10px;
-  letter-spacing: 0.08em;
-}
-
-.sidebar-bottom p {
-  margin: 15px 5px 0;
-  color: var(--dim);
-  font: 500 9px/1.7 var(--font-display);
   letter-spacing: 0.08em;
 }
 
@@ -464,6 +423,66 @@ select {
   margin-top: 8px;
   color: var(--dim);
   font-size: 9px;
+}
+
+.data-scope-banner {
+  display: grid;
+  align-items: center;
+  margin-top: 17px;
+  padding: 12px 15px;
+  border: 1px solid rgba(214, 183, 122, 0.2);
+  border-radius: 7px;
+  gap: 13px;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  background: linear-gradient(90deg, rgba(214, 183, 122, 0.1), rgba(214, 183, 122, 0.025));
+}
+
+.scope-badge {
+  padding: 6px 8px;
+  border-radius: 4px;
+  color: #17130d;
+  background: var(--gold);
+  font: 800 8px/1 var(--font-display);
+  letter-spacing: 0.12em;
+}
+
+.scope-copy {
+  display: flex;
+  align-items: baseline;
+  min-width: 0;
+  gap: 12px;
+}
+
+.scope-copy strong {
+  flex: none;
+  font: 700 12px/1.4 var(--font-display);
+}
+
+.scope-copy span {
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.6;
+}
+
+.scope-period {
+  color: var(--gold);
+  font: 700 10px/1 var(--font-display);
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.annual-scope {
+  margin-top: 27px;
+  border-color: rgba(130, 186, 142, 0.26);
+  background: linear-gradient(90deg, rgba(130, 186, 142, 0.11), rgba(130, 186, 142, 0.025));
+}
+
+.annual-scope .scope-badge {
+  background: var(--green);
+}
+
+.annual-scope .scope-period {
+  color: var(--green);
 }
 
 .metric-grid {
@@ -722,7 +741,7 @@ select {
 }
 
 .annual-flow-panel {
-  margin-top: 17px;
+  margin-top: 10px;
 }
 
 .panel-description,
@@ -952,13 +971,12 @@ tbody tr.selected {
     padding: 17px 18px;
   }
 
-  .side-nav,
-  .sidebar-bottom {
-    display: none;
-  }
-
   .company-switcher {
     display: flex;
+    margin-top: 15px;
+  }
+
+  .sidebar-bottom {
     margin-top: 15px;
   }
 
@@ -999,6 +1017,21 @@ tbody tr.selected {
 
   .quarter-picker {
     margin-top: 21px;
+  }
+
+  .data-scope-banner {
+    align-items: start;
+    gap: 8px 10px;
+    grid-template-columns: auto 1fr;
+  }
+
+  .scope-copy {
+    display: grid;
+    gap: 3px;
+  }
+
+  .scope-period {
+    grid-column: 2;
   }
 
   .metric-grid {
