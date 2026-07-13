@@ -10,3 +10,4 @@ AGENTS.md
 README.md
 schema.sql
 wrangler.jsonc
+worker.js

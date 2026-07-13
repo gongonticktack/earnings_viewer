@@ -23,6 +23,31 @@ async function loadAppConfig() {
 
 const appConfig = await loadAppConfig();
 
+/**
+ * 概要: Supabase REST APIから公開テーブルのデータを取得します。
+ * 引数: table - テーブル名。query - PostgRESTへ渡す検索条件。
+ * 戻り値: 取得した行の配列を返すPromise。
+ */
+async function fetchSupabaseRows(table, query = {}) {
+  const { url, key } = appConfig.supabase ?? {};
+  if (!url || !key) throw new Error("config.jsonにSupabaseのurlとkeyを設定してください。");
+
+  const endpoint = new URL(`/rest/v1/${table}`, url);
+  Object.entries(query).forEach(([name, value]) => endpoint.searchParams.set(name, value));
+  const response = await fetch(endpoint, {
+    headers: {
+      apikey: key,
+      Authorization: `Bearer ${key}`,
+      Accept: "application/json",
+    },
+  });
+  if (!response.ok) {
+    const detail = await response.text();
+    throw new Error(`${table}の取得に失敗しました (${response.status}): ${detail}`);
+  }
+  return response.json();
+}
+
 // サイドバーに出す会社の基本情報です。画面表示や株価取得で同じ情報を使います。
 const companies = {
   kioxia: {
@@ -351,17 +376,42 @@ function normalizeFallbackQuarterlyResults(resultsByCompany) {
 
 const fallbackQuarterlyResults = normalizeFallbackQuarterlyResults(fallbackResults);
 
+/**
+ * 概要: 四半期データのsourceUrlから、DB障害時に表示する資料一覧を作ります。
+ * 引数: resultsByCompany - 会社ごとの四半期データ。
+ * 戻り値: 会社ごとのIR資料一覧。
+ */
+function buildFallbackDocuments(resultsByCompany) {
+  return Object.fromEntries(Object.entries(resultsByCompany).map(([companyCode, rows]) => [
+    companyCode,
+    [...new Map(rows.filter((row) => row.sourceUrl).map((row) => [row.sourceUrl, {
+      fiscalYear: row.fiscalYear,
+      quarter: row.quarter,
+      title: `FY${row.fiscalYear} Q${row.quarter} financial results`,
+      url: row.sourceUrl,
+      sourceName: "official_ir",
+      publishedAt: row.periodEnd,
+    }])).values()].sort((a, b) => b.publishedAt.localeCompare(a.publishedAt)),
+  ]));
+}
+
+const fallbackDocumentsByCompany = buildFallbackDocuments(fallbackQuarterlyResults);
+
 // 画面の今の状態を1か所に集めています。会社を変えたり、PDF一覧を読んだりするとここが変わります。
 const state = {
   companyCode: "toyota",
   resultsByCompany: { ...fallbackQuarterlyResults },
-  officialIrDocumentsByCompany: {},
+  officialIrDocumentsByCompany: { ...fallbackDocumentsByCompany },
   results: fallbackQuarterlyResults.toyota,
   activeId: fallbackQuarterlyResults.toyota.at(-1).id,
   lastUpdatedAtByCompany: {},
   stockChartSymbol: companies.toyota.stockSymbol,
   renderedStockChartSymbol: null,
   stockPrices: [],
+  stockPricesBySymbol: {},
+  stockChartStatus: "idle",
+  stockChartError: "",
+  databaseLoaded: false,
 };
 
 // HTMLの部品を先に探しておきます。あとで何度もdocument.querySelectorを書かなくて済みます。
@@ -602,6 +652,7 @@ function renderDocuments() {
 }
 
 function officialDocumentFiscalYear(document) {
+  if (document.fiscalYear) return `FY${document.fiscalYear}`;
   const value = `${document.title} ${document.url}`;
   const mufgMatch = value.match(/summary(\d{2})(?:03|06|09|12)_ja\.pdf/i);
   if (mufgMatch) return `FY20${mufgMatch[1]}`;
@@ -620,6 +671,7 @@ function officialDocumentFiscalYear(document) {
 }
 
 function officialDocumentQuarter(document) {
+  if (document.quarter) return `Q${document.quarter}`;
   const value = `${document.title} ${document.url}`;
   const mufgMatch = value.match(/summary\d{2}(03|06|09|12)_ja\.pdf/i);
   if (mufgMatch) return { "03": "Q4", "06": "Q1", "09": "Q2", "12": "Q3" }[mufgMatch[1]];
@@ -965,7 +1017,7 @@ function renderCharts() {
 }
 
 /**
- * 概要: 株価データを折れ線グラフとして描きます。
+ * 概要: 週足株価をローソク足グラフとして描きます。
  * 引数: なし。
  * 戻り値: なし。
  */
@@ -1032,14 +1084,22 @@ function drawStockChart() {
 
 function renderStockChart() {
   state.renderedStockChartSymbol = state.stockChartSymbol;
-  state.stockPrices = [];
+  if (state.stockPrices.length) {
+    drawStockChart();
+    const latest = state.stockPrices.at(-1);
+    elements.stockChartStatus.textContent = `${state.stockChartSymbol} / ${state.stockPrices.length}週 / ${formatDate(latest.date)} 終値 ¥${latest.close.toLocaleString("ja-JP")}`;
+    return;
+  }
   const { context: ctx, width, height } = prepareCanvas(elements.stockChart);
   ctx.clearRect(0, 0, width, height);
   ctx.fillStyle = "#9b998f";
   ctx.font = '600 13px "Noto Sans JP"';
   ctx.textAlign = "center";
-  ctx.fillText("Workerを使わない構成のため、株価チャートは現在取得しません。", width / 2, height / 2);
-  elements.stockChartStatus.textContent = `${state.stockChartSymbol} / 株価取得なし`;
+  const isLoading = state.stockChartStatus === "loading";
+  ctx.fillText(isLoading ? "週足株価を読み込んでいます。" : "週足株価を取得できませんでした。", width / 2, height / 2);
+  elements.stockChartStatus.textContent = isLoading
+    ? `${state.stockChartSymbol} / 読み込み中`
+    : `${state.stockChartSymbol} / ${state.stockChartError || "株価データなし"}`;
 }
 
 /**
@@ -1106,21 +1166,116 @@ function updateLatestUpdate(companyCode = state.companyCode) {
 }
 
 /**
- * 概要: 登録済みの決算データから、PDFリンク一覧を作ります。
- * 引数: companyCode - 対象会社コード。
- * 戻り値: PDF一覧を含む結果を返すPromise。
+ * 概要: DBの会社、四半期業績、IR資料を読み込み、画面用の状態へ反映します。
+ * 引数: なし。
+ * 戻り値: 読み込み完了を示すPromise。
  */
-async function loadOfficialIrDocuments(companyCode) {
-  const rows = fallbackResults[companyCode] ?? [];
-  const documents = [...new Map(rows
-    .filter((row) => row.sourceUrl)
-    .map((row) => [row.sourceUrl, {
-      title: `FY${row.fiscalYear} Q${row.quarter} financial results`,
-      url: row.sourceUrl,
-    }])).values()];
-  state.officialIrDocumentsByCompany[companyCode] = documents;
-  state.lastUpdatedAtByCompany[companyCode] = new Date().toISOString();
-  return { documents };
+async function loadDatabaseData() {
+  const [companyRows, resultRows, documentRows] = await Promise.all([
+    fetchSupabaseRows("earn_companies", {
+      select: "code,name,stock_code,ir_url,display_order,updated_at",
+      active: "eq.true",
+      order: "display_order.asc",
+    }),
+    fetchSupabaseRows("earn_quarterly_results", {
+      select: "id,company_code,fiscal_year,quarter,period_end,revenue,operating_cost,operating_income,pretax_income,net_income,source_url,updated_at",
+      order: "company_code.asc,fiscal_year.asc,quarter.asc",
+    }),
+    fetchSupabaseRows("earn_ir_documents", {
+      select: "id,company_code,fiscal_year,quarter,title,url,source_name,published_at,updated_at",
+      order: "company_code.asc,published_at.desc",
+    }),
+  ]);
+
+  companyRows.forEach((row) => {
+    if (!companies[row.code]) return;
+    companies[row.code] = {
+      ...companies[row.code],
+      name: row.name,
+      sourceName: `${row.name} IR`,
+      sourcePage: row.ir_url,
+      stockSymbol: `${row.stock_code}.T`,
+    };
+  });
+
+  const resultsByCompany = Object.fromEntries(Object.keys(companies).map((code) => [code, []]));
+  resultRows.forEach((row) => {
+    if (!resultsByCompany[row.company_code]) return;
+    resultsByCompany[row.company_code].push({
+      id: row.id,
+      companyCode: row.company_code,
+      fiscalYear: row.fiscal_year,
+      quarter: row.quarter,
+      periodType: `Q${row.quarter}`,
+      periodStart: null,
+      periodEnd: row.period_end,
+      revenue: row.revenue,
+      operatingCost: row.operating_cost,
+      operatingIncome: row.operating_income,
+      pretaxIncome: row.pretax_income,
+      netIncome: row.net_income,
+      sourceUrl: row.source_url,
+      updatedAt: row.updated_at,
+    });
+  });
+
+  const documentsByCompany = Object.fromEntries(Object.keys(companies).map((code) => [code, []]));
+  documentRows.forEach((row) => {
+    if (!documentsByCompany[row.company_code]) return;
+    documentsByCompany[row.company_code].push({
+      id: row.id,
+      fiscalYear: row.fiscal_year,
+      quarter: row.quarter,
+      title: row.title,
+      url: row.url,
+      sourceName: row.source_name,
+      publishedAt: row.published_at,
+      updatedAt: row.updated_at,
+    });
+  });
+
+  Object.entries(resultsByCompany).forEach(([companyCode, rows]) => {
+    rows.forEach((row) => {
+      if (!row.sourceUrl || documentsByCompany[companyCode].some((item) => item.url === row.sourceUrl)) return;
+      documentsByCompany[companyCode].push({
+        fiscalYear: row.fiscalYear,
+        quarter: row.quarter,
+        title: `FY${row.fiscalYear} Q${row.quarter} financial results`,
+        url: row.sourceUrl,
+        sourceName: "official_ir",
+        publishedAt: row.periodEnd,
+        updatedAt: row.updatedAt,
+      });
+    });
+    documentsByCompany[companyCode].sort((a, b) => (b.publishedAt ?? "").localeCompare(a.publishedAt ?? ""));
+  });
+
+  state.resultsByCompany = resultsByCompany;
+  state.officialIrDocumentsByCompany = documentsByCompany;
+  state.lastUpdatedAtByCompany = Object.fromEntries(Object.entries(resultsByCompany).map(([companyCode, rows]) => [
+    companyCode,
+    rows.map((row) => row.updatedAt).filter(Boolean).sort().at(-1) ?? null,
+  ]));
+  state.databaseLoaded = true;
+}
+
+/**
+ * 概要: Worker経由で直近1年の週足株価を取得し、会社ごとにキャッシュします。
+ * 引数: symbol - Yahoo Finance形式の銘柄コード。force - キャッシュを無視するか。
+ * 戻り値: 週足株価の配列を返すPromise。
+ */
+async function loadStockPrices(symbol, { force = false } = {}) {
+  if (!force && state.stockPricesBySymbol[symbol]) return state.stockPricesBySymbol[symbol];
+  const response = await fetch(`/api/stock-prices?symbol=${encodeURIComponent(symbol)}`);
+  if (!response.ok) {
+    const payload = await response.json().catch(() => ({}));
+    throw new Error(payload.error || `株価APIの取得に失敗しました (${response.status})`);
+  }
+  const payload = await response.json();
+  const prices = Array.isArray(payload.prices) ? payload.prices : [];
+  if (!prices.length) throw new Error("週足株価がありません");
+  state.stockPricesBySymbol[symbol] = prices;
+  return prices;
 }
 
 /**
@@ -1128,16 +1283,51 @@ async function loadOfficialIrDocuments(companyCode) {
  * 引数: notify - トースト通知を出すか。
  * 戻り値: 更新処理が終わったことを示すPromise。
  */
-async function refreshCompany({ notify = false } = {}) {
+async function refreshCompany({ notify = false, reloadDatabase = false, forceStock = false } = {}) {
   const companyCode = state.companyCode;
-  const payload = await loadOfficialIrDocuments(companyCode);
+  const symbol = companies[companyCode].stockSymbol;
+  elements.refreshButton.disabled = true;
+  elements.refreshButtonLabel.textContent = "更新中";
+  state.stockChartStatus = "loading";
+  state.stockChartError = "";
+  state.stockPrices = state.stockPricesBySymbol[symbol] ?? [];
+  renderStockChart();
+
+  let databaseError = null;
+  if (reloadDatabase || !state.databaseLoaded) {
+    try {
+      await loadDatabaseData();
+    } catch (error) {
+      databaseError = error;
+      console.error("DBデータの取得に失敗しました。予備データを表示します。", error);
+    }
+  }
+
+  let stockError = null;
+  try {
+    state.stockPrices = await loadStockPrices(symbol, { force: forceStock });
+    state.stockChartStatus = "ready";
+  } catch (error) {
+    stockError = error;
+    state.stockPrices = [];
+    state.stockChartStatus = "error";
+    state.stockChartError = error.message;
+    console.error("週足株価の取得に失敗しました。", error);
+  }
+
   if (state.companyCode === companyCode) {
-    state.results = state.resultsByCompany[companyCode];
+    state.stockChartSymbol = companies[companyCode].stockSymbol;
+    state.results = state.resultsByCompany[companyCode] ?? [];
     state.activeId = state.results.at(-1)?.id ?? null;
     updateLatestUpdate(companyCode);
     render();
   }
-  if (notify) showToast(`${payload.documents?.length ?? 0}件の登録済みPDFを表示しました。`);
+  updateRefreshButtonAvailability();
+  if (notify) {
+    if (databaseError) showToast("DBの取得に失敗したため、予備データを表示しています。");
+    else if (stockError) showToast("決算データを更新しました。株価のみ取得できませんでした。");
+    else showToast("DBデータと週足株価を更新しました。");
+  }
 }
 
 // ここから下は、ユーザー操作に反応するイベント設定です。
@@ -1161,14 +1351,20 @@ elements.companyButtons.forEach((button) => {
   button.addEventListener("click", async () => {
     state.companyCode = button.dataset.company;
     state.stockChartSymbol = companies[state.companyCode].stockSymbol;
-    state.results = state.resultsByCompany[state.companyCode];
+    state.results = state.resultsByCompany[state.companyCode] ?? [];
     state.activeId = state.results.at(-1)?.id ?? null;
+    state.stockPrices = state.stockPricesBySymbol[state.stockChartSymbol] ?? [];
+    state.stockChartStatus = state.stockPrices.length ? "ready" : "loading";
     updateLatestUpdate();
     render();
     await refreshCompany();
   });
 });
-elements.refreshButton.addEventListener("click", () => refreshCompany({ notify: true }));
+elements.refreshButton.addEventListener("click", () => refreshCompany({
+  notify: true,
+  reloadDatabase: true,
+  forceStock: true,
+}));
 window.addEventListener("resize", () => {
   renderCharts();
   if (state.stockPrices.length) drawStockChart();
@@ -1177,4 +1373,4 @@ window.addEventListener("resize", () => {
 // ページを開いた直後に、まず予備データで描画してから最新データを取りに行きます。
 updateLatestUpdate();
 render();
-refreshCompany();
+refreshCompany({ reloadDatabase: true });
