@@ -1,10 +1,12 @@
 import config from "./config.json";
 
+// 株価APIに問い合わせてよい銘柄だけをここに並べます。知らない銘柄を外へ投げないためです。
 const stockSymbols = new Set([
   "285A.T", "7203.T", "8306.T", "9984.T", "8035.T", "9983.T", "8316.T", "6857.T", "6501.T", "8411.T",
   "6758.T", "6981.T", "6861.T", "6098.T", "8058.T", "8001.T", "8766.T", "4063.T", "9432.T", "8031.T",
 ]);
 
+// このサイトの会社コードと、EDINETで会社を探すための証券コードを対応させています。
 const edinetCompanies = {
   kioxia: "285A",
   toyota: "7203",
@@ -28,10 +30,12 @@ const edinetCompanies = {
   mitsui: "8031",
 };
 
+// EDINETの書類のうち、決算に関係する種類だけを対象にします。
 const edinetDocumentTypes = new Set(["120", "130", "140", "150", "160", "170"]);
 const edinetLegalStatuses = new Set(["1", "2"]);
 const maxEdinetSyncDays = 31;
 const edinetApiBaseUrl = "https://api.edinet-fsa.go.jp/api/v2";
+// XBRLの中から拾いたい数字の名前です。会社によって少し名前が違うので複数用意します。
 const xbrlFactDefinitions = [
   { concept: "NetSales", label: "Net sales", order: 10 },
   { concept: "NetSalesSummaryOfBusinessResults", label: "Net sales", order: 10 },
@@ -77,6 +81,7 @@ const xbrlFactDefinitions = [
   { concept: "Equity", label: "Equity", order: 72 },
 ];
 const xbrlFactDefinitionByConcept = new Map(xbrlFactDefinitions.map((definition) => [definition.concept, definition]));
+// ここから下は、XBRLの色々な名前を「売上」「利益」「現金」などにまとめるための辞書です。
 const revenueConcepts = [
   "RevenueIFRSSummaryOfBusinessResults", "RevenueIFRS", "SalesRevenuesIFRS", "TotalNetRevenuesIFRS", "Revenue",
   "NetSalesSummaryOfBusinessResults", "NetSales", "OperatingRevenue",
@@ -124,6 +129,11 @@ function hasSupabaseConfig() {
   return Boolean(supabaseUrl && supabaseKey);
 }
 
+/**
+ * 概要: EDINET APIキーがないと数字を取りに行けないので、早めに分かりやすく止めます。
+ * 引数: なし。
+ * 戻り値: config.jsonに設定されたEDINET APIキー。
+ */
 function requireEdinetApiKey() {
   const apiKey = config.edinet?.apiKey;
   if (!apiKey) {
@@ -132,6 +142,11 @@ function requireEdinetApiKey() {
   return apiKey;
 }
 
+/**
+ * 概要: Supabase REST APIにアクセスするときに毎回使うヘッダーを作ります。
+ * 引数: prefer - SupabaseのPreferヘッダーに入れる値。
+ * 戻り値: Supabase API用のヘッダー。
+ */
 function supabaseHeaders(prefer = null) {
   const headers = {
     apikey: supabaseKey,
@@ -142,6 +157,7 @@ function supabaseHeaders(prefer = null) {
   return headers;
 }
 
+// 公式IR PDFを探すための会社ごとの設定です。サイトごとにURLやPDF名の形が違います。
 const irSources = {
   kioxia: {
     sourcePage: "https://www.kioxia-holdings.com/ja-jp/ir/library/data.html",
@@ -239,6 +255,11 @@ const irSources = {
   },
 };
 
+/**
+ * 概要: Workerから返すエラーをJSONにそろえます。画面側で扱いやすくするためです。
+ * 引数: error - エラー内容、status - HTTPステータス。
+ * 戻り値: エラー情報を含むJSONレスポンス。
+ */
 function jsonError(error, status = 500) {
   const message = error instanceof Error ? error.message : String(error ?? "Unknown error");
   return Response.json({ error: message }, { status });
@@ -270,6 +291,11 @@ function dateRangeEndingAt(endDate, days) {
   }).reverse();
 }
 
+/**
+ * 概要: URLのdateとdaysから、EDINETへ問い合わせる日付一覧を作ります。
+ * 引数: url - リクエストURL。
+ * 戻り値: EDINETへ問い合わせる日付文字列の配列。
+ */
 function requestedEdinetDates(url) {
   const endDate = url.searchParams.get("date") ?? jstDate();
   const days = Number(url.searchParams.get("days") ?? "1");
@@ -280,6 +306,11 @@ function requestedEdinetDates(url) {
   return dateRangeEndingAt(endDate, days);
 }
 
+/**
+ * 概要: EDINET APIのURLを作ります。APIキーはクエリにも付けておきます。
+ * 引数: path - APIパス、apiKey - EDINET APIキー、params - 追加クエリ。
+ * 戻り値: EDINET APIへアクセスするURL。
+ */
 function edinetUrl(path, apiKey, params = {}) {
   const url = new URL(`${edinetApiBaseUrl}${path}`);
   url.searchParams.set("Subscription-Key", apiKey);
@@ -287,6 +318,11 @@ function edinetUrl(path, apiKey, params = {}) {
   return url;
 }
 
+/**
+ * 概要: 指定日のEDINET提出書類一覧を取得します。まだXBRL本体は取りません。
+ * 引数: _env - Worker環境、date - 取得対象日。
+ * 戻り値: EDINET提出書類一覧を返すPromise。
+ */
 async function fetchEdinetDocumentList(_env, date) {
   const apiKey = requireEdinetApiKey();
   const response = await fetch(edinetUrl("/documents.json", apiKey, { date, type: "2" }), {
@@ -311,11 +347,21 @@ async function fetchEdinetDocumentList(_env, date) {
   return payload.results ?? [];
 }
 
+/**
+ * 概要: EDINET書類の証券コードから、このサイト内の会社コードへ変換します。
+ * 引数: document - EDINET書類メタデータ。
+ * 戻り値: サイト内の会社コード。対象外ならnull。
+ */
 function companyCodeFor(document) {
   const secCode = String(document.secCode ?? "");
   return Object.entries(edinetCompanies).find(([, stockCode]) => secCode.startsWith(stockCode))?.[0] ?? null;
 }
 
+/**
+ * 概要: 取り消し・非公開などを除き、使える決算書類かどうかを判定します。
+ * 引数: document - EDINET書類メタデータ。
+ * 戻り値: 使える決算書類ならtrue。
+ */
 function isFinancialDocument(document) {
   return edinetDocumentTypes.has(String(document.docTypeCode))
     && document.withdrawalStatus === "0"
@@ -323,6 +369,11 @@ function isFinancialDocument(document) {
     && edinetLegalStatuses.has(String(document.legalStatus));
 }
 
+/**
+ * 概要: EDINETの書類データを、Supabaseへ保存しやすい形に整えます。
+ * 引数: document - EDINET書類メタデータ、companyCode - サイト内の会社コード。
+ * 戻り値: DB保存用に整えた書類データ。
+ */
 function serializeEdinetDocument(document, companyCode) {
   return {
     id: document.docID,
@@ -350,6 +401,11 @@ function filterEdinetDocuments(documents, requestedCompanyCode = null) {
   return [...new Map(filtered.map((document) => [document.id, document])).values()];
 }
 
+/**
+ * 概要: EDINETの書類IDから、XBRLが入ったZIPファイルを取得します。
+ * 引数: _env - Worker環境、documentId - EDINET書類ID。
+ * 戻り値: ZIPファイルのArrayBufferを返すPromise。
+ */
 async function fetchEdinetXbrlArchive(_env, documentId) {
   const apiKey = requireEdinetApiKey();
   const response = await fetch(edinetUrl(`/documents/${documentId}`, apiKey, { type: "1" }), {
@@ -386,6 +442,11 @@ function findZipEndOfCentralDirectory(view) {
   throw new Error("EDINET XBRL ZIP central directory was not found");
 }
 
+/**
+ * 概要: ZIPの中から、必要なテキストファイルだけを取り出します。
+ * 引数: buffer - ZIPファイル本体、predicate - 取り出すファイル名を選ぶ関数。
+ * 戻り値: ファイル名と本文の配列を返すPromise。
+ */
 async function unzipTextFiles(buffer, predicate) {
   const view = new DataView(buffer);
   const eocdOffset = findZipEndOfCentralDirectory(view);
@@ -426,6 +487,11 @@ function decodeXml(value) {
     .replaceAll("&gt;", ">");
 }
 
+/**
+ * 概要: XBRLのcontextは「この数字がいつの期間の数字か」を表します。
+ * 引数: xbrl - XBRL本文。
+ * 戻り値: contextRefをキーにした期間情報のMap。
+ */
 function parseXbrlContexts(xbrl) {
   const contexts = new Map();
   const contextPattern = /<[^<\s:]*:?context\b([^>]*)>([\s\S]*?)<\/[^<\s:]*:?context>/gi;
@@ -442,6 +508,11 @@ function parseXbrlContexts(xbrl) {
   return contexts;
 }
 
+/**
+ * 概要: XBRL本文から、売上や利益など表示に使う数字だけを抜き出します。
+ * 引数: document - EDINET書類データ、xbrl - XBRL本文。
+ * 戻り値: DB保存用のXBRL数値配列。
+ */
 function parseXbrlFacts(document, xbrl) {
   const contexts = parseXbrlContexts(xbrl);
   const factPattern = /<([A-Za-z_][\w.-]*:)?([A-Za-z_][\w.-]*)\b([^>]*)>([^<]+)<\/\1?\2>/g;
@@ -480,6 +551,11 @@ function parseXbrlFacts(document, xbrl) {
   return facts.sort((a, b) => a.display_order - b.display_order);
 }
 
+/**
+ * 概要: 1つのEDINET書類について、ZIP取得からXBRL数字の抜き出しまで行います。
+ * 引数: env - Worker環境、document - EDINET書類データ。
+ * 戻り値: XBRL数値配列を返すPromise。
+ */
 async function extractEdinetFacts(env, document) {
   const archive = await fetchEdinetXbrlArchive(env, document.id);
   const files = await unzipTextFiles(archive, (name) => (
@@ -491,6 +567,11 @@ async function extractEdinetFacts(env, document) {
   return primary ? parseXbrlFacts(document, primary.text) : [];
 }
 
+/**
+ * 概要: EDINET書類の基本情報をDBへ保存します。
+ * 引数: env - Worker環境、documents - 保存する書類データ配列。
+ * 戻り値: Worker側で保存できた場合はtrue、画面側保存に任せる場合はfalseを返すPromise。
+ */
 async function saveEdinetDocuments(env, documents) {
   if (!documents.length) return true;
   if (!hasSupabaseConfig()) {
@@ -508,6 +589,11 @@ async function saveEdinetDocuments(env, documents) {
   return true;
 }
 
+/**
+ * 概要: XBRLから抜き出した数字をDBへ保存します。
+ * 引数: env - Worker環境、facts - 保存するXBRL数値配列。
+ * 戻り値: Worker側で保存できた場合はtrue、画面側保存に任せる場合はfalseを返すPromise。
+ */
 async function saveEdinetFacts(env, facts) {
   if (!facts.length) return true;
   if (!hasSupabaseConfig()) {
@@ -525,6 +611,11 @@ async function saveEdinetFacts(env, facts) {
   return true;
 }
 
+/**
+ * 概要: SupabaseのREST APIは一度に読める数に限りがあるので、ページを分けて全部読みます。
+ * 引数: env - Worker環境、table - テーブル名、query - REST APIのクエリ文字列。
+ * 戻り値: 取得した全行を返すPromise。
+ */
 async function fetchAllSupabaseRows(env, table, query) {
   const rows = [];
   const pageSize = 1000;
@@ -568,6 +659,11 @@ function durationDays(start, end) {
   return Math.round((Date.parse(`${end}T00:00:00Z`) - Date.parse(`${start}T00:00:00Z`)) / 86400000);
 }
 
+/**
+ * 概要: 同じような数字が複数あるとき、連結・当期など「使いたい数字」らしいものを高得点にします。
+ * 引数: contextRef - XBRLのcontextRef。
+ * 戻り値: 優先度を表す点数。
+ */
 function contextScore(contextRef = "") {
   const value = contextRef.toLowerCase();
   let score = 0;
@@ -579,6 +675,11 @@ function contextScore(contextRef = "") {
   return score;
 }
 
+/**
+ * 概要: factsの中から、指定した期間に合う売上や利益の値を1つ選びます。
+ * 引数: facts - XBRL数値配列、concepts - 探すconcept名、periodStart - 期首、periodEnd - 期末、instant - 一時点の値として探すか。
+ * 戻り値: 百万円単位へ変換した数値。見つからない場合はnull。
+ */
 function metricValue(facts, concepts, periodStart, periodEnd, instant = false) {
   for (const concept of concepts) {
     const candidates = facts
@@ -592,6 +693,11 @@ function metricValue(facts, concepts, periodStart, periodEnd, instant = false) {
   return null;
 }
 
+/**
+ * 概要: EDINETの書類を、このサイトで使う「上期」または「通期」に分類します。
+ * 引数: document - EDINET書類データ、facts - その書類から抜き出したXBRL数値。
+ * 戻り値: 期間種別と対象期間。対象外ならnull。
+ */
 function effectivePeriod(document, facts) {
   const docType = String(document.doc_type_code);
   if (docType === "120") {
@@ -615,6 +721,11 @@ function effectivePeriod(document, facts) {
   return { periodType: "H1", periodStart, periodEnd };
 }
 
+/**
+ * 概要: 同じ会社・同じ年度・同じ期間の書類が複数あるときは、いちばん新しい提出分を使います。
+ * 引数: documents - EDINET書類配列、factsByDocument - 書類IDごとのXBRL数値Map。
+ * 戻り値: 期間ごとに最新化した書類配列。
+ */
 function latestDocumentsByPeriod(documents, factsByDocument) {
   const fiscalEndMonths = new Map();
   for (const document of documents) {
@@ -643,6 +754,11 @@ function latestDocumentsByPeriod(documents, factsByDocument) {
   return [...latest.values()];
 }
 
+/**
+ * 概要: EDINETの生データから、画面で使う決算テーブル用の行を作ります。
+ * 引数: documents - EDINET書類配列、facts - XBRL数値配列。
+ * 戻り値: 期間決算行と年間キャッシュフロー行。
+ */
 function buildDashboardRows(documents, facts) {
   const factsByDocument = new Map();
   for (const fact of facts) {
@@ -722,6 +838,11 @@ function buildDashboardRows(documents, facts) {
   return { periodResults, annualFlows };
 }
 
+/**
+ * 概要: 保存済みのXBRL数値を、画面が直接読むテーブルへ変換して登録します。
+ * 引数: env - Worker環境、companyCodes - 対象会社コード配列。
+ * 戻り値: 登録した期間決算行数と年間キャッシュフロー行数を返すPromise。
+ */
 async function promoteEdinetFacts(env, companyCodes) {
   if (!companyCodes.length || !hasSupabaseConfig()) {
     return { periodResults: 0, annualFlows: 0 };
@@ -750,6 +871,11 @@ async function promoteEdinetFacts(env, companyCodes) {
   return { periodResults: rows.periodResults.length, annualFlows: rows.annualFlows.length };
 }
 
+/**
+ * 概要: /api/edinet/sync の本体です。EDINET取得、DB保存、画面用データ作成をまとめて行います。
+ * 引数: request - Workerへのリクエスト、env - Worker環境。
+ * 戻り値: 同期結果を含むJSONレスポンスを返すPromise。
+ */
 async function syncEdinetDocuments(request, env) {
   const url = new URL(request.url);
   const requestedCompanyCode = url.searchParams.get("company");
@@ -817,6 +943,11 @@ async function syncEdinetDocuments(request, env) {
   });
 }
 
+/**
+ * 概要: /api/edinet/:company の本体です。指定日のEDINET書類一覧だけを返します。
+ * 引数: request - Workerへのリクエスト、env - Worker環境、companyCode - 対象会社コード。
+ * 戻り値: EDINET書類一覧を含むJSONレスポンスを返すPromise。
+ */
 async function fetchCompanyEdinetDocuments(request, env, companyCode) {
   if (!edinetCompanies[companyCode]) return jsonError("Company is not configured", 404);
   const url = new URL(request.url);
@@ -858,6 +989,11 @@ function isOfficialFinancialDocument(document, source) {
   return isFinancialDocumentTitle(`${document.title} ${document.url} ${document.context}`, source);
 }
 
+/**
+ * 概要: 会社のIRページHTMLから、決算PDFらしいリンクだけを探します。
+ * 引数: html - IRページHTML、source - 会社ごとの探索設定。
+ * 戻り値: 決算PDF候補の配列。
+ */
 function discoverOfficialIrPdfs(html, source) {
   const documents = [];
   const seen = new Set();
@@ -894,6 +1030,11 @@ function discoverOfficialIrPdfs(html, source) {
     .slice(0, 30);
 }
 
+/**
+ * 概要: /api/ir/:company の本体です。公式IRページを見に行ってPDFリンクを返します。
+ * 引数: companyCode - 対象会社コード。
+ * 戻り値: PDF一覧を含むJSONレスポンスを返すPromise。
+ */
 async function fetchOfficialIrDocuments(companyCode) {
   const source = irSources[companyCode];
   if (!source) return jsonError("IR source is not configured", 404);
@@ -911,6 +1052,11 @@ async function fetchOfficialIrDocuments(companyCode) {
   });
 }
 
+/**
+ * 概要: /api/stocks/:symbol の本体です。Yahoo Financeから株価チャート用データを返します。
+ * 引数: symbol - 株価シンボル。
+ * 戻り値: 株価JSONレスポンスを返すPromise。
+ */
 async function fetchStock(symbol) {
   if (!stockSymbols.has(symbol)) return new Response("Unsupported stock symbol", { status: 400 });
   const upstreamUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?range=2y&interval=1wk`;
@@ -928,6 +1074,11 @@ async function fetchStock(symbol) {
 }
 
 export default {
+  /**
+   * 概要: Workerの入口です。URLに合わせて、EDINET・IR PDF・株価の処理へ振り分けます。
+   * 引数: request - ブラウザや外部から届いたリクエスト、env - Cloudflare Workerの環境情報。
+   * 戻り値: 各APIの結果を表すレスポンスを返すPromise。
+   */
   async fetch(request, env) {
     try {
       const url = new URL(request.url);

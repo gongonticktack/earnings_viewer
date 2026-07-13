@@ -142,13 +142,6 @@ body::after {
   gap: 3px;
 }
 
-.sidebar-label {
-  margin: 0 0 5px 5px;
-  color: var(--dim);
-  font: 700 8px/1 var(--font-display);
-  letter-spacing: 0.17em;
-}
-
 .company-button {
   display: flex;
   align-items: center;
@@ -978,10 +971,6 @@ tbody tr.selected {
 
   .sidebar-bottom {
     margin-top: 15px;
-  }
-
-  .sidebar-label {
-    display: none;
   }
 
   .main-content {

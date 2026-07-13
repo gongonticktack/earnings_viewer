@@ -13,6 +13,11 @@ const defaultAppConfig = {
   },
 };
 
+/**
+ * 概要: config.jsonを読み込みます。読めなかったときは、空の初期設定で画面だけ動かします。
+ * 引数: なし。
+ * 戻り値: 画面とAPIで使う設定オブジェクトを返すPromise。
+ */
 async function loadAppConfig() {
   try {
     const response = await fetch(new URL("./config.json", import.meta.url));
@@ -32,6 +37,7 @@ async function loadAppConfig() {
 
 const appConfig = await loadAppConfig();
 
+// サイドバーに出す会社の基本情報です。画面表示や株価取得で同じ情報を使います。
 const companies = {
   kioxia: {
     code: "kioxia", name: "KIOXIA HOLDINGS CORPORATION", sourceName: "KIOXIA IR",
@@ -136,7 +142,8 @@ const companies = {
   },
 };
 
-// Official PDFs publish cumulative values. Each entry below is normalized to a standalone quarter.
+// DBからまだ読めないときに使う予備データです。画面が空っぽにならないための保険です。
+// 公式PDFは累計で出ることが多いので、ここでは四半期ごとの数字に直した値を置いています。
 const fallbackResults = {
   kioxia: [],
   toyota: [
@@ -336,6 +343,11 @@ const fallbackResults = {
   mitsui: [],
 };
 
+/**
+ * 概要: 予備データの四半期情報を、EDINETに合わせた「上期」と「通期」の形へまとめます。
+ * 引数: resultsByCompany - 会社ごとの四半期予備データ。
+ * 戻り値: 会社ごとの上期・通期データ。
+ */
 function cumulativeFallbackPeriods(resultsByCompany) {
   const sumMetric = (rows, key) => rows.every((row) => row[key] !== null && row[key] !== undefined)
     ? rows.reduce((total, row) => total + row[key], 0)
@@ -379,6 +391,7 @@ const fallbackPeriodResults = cumulativeFallbackPeriods(fallbackResults);
 
 const registeredDataDescription = "公式IR資料をもとにJSへ登録済みのデータ（リアルタイム自動取得ではありません）";
 
+// 年間のキャッシュフロー表示に使うデータです。DBに値があれば、このあと上書きされます。
 const annualAnalyses = {
   toyota: {
     previousFiscalYear: "FY2025",
@@ -441,6 +454,7 @@ const annualAnalyses = {
   },
 };
 
+// 画面の今の状態を1か所に集めています。会社を変えたり、DBから読んだりするとここが変わります。
 const state = {
   companyCode: "toyota",
   resultsByCompany: { ...fallbackPeriodResults },
@@ -456,6 +470,7 @@ const state = {
   stockPrices: [],
 };
 
+// HTMLの部品を先に探しておきます。あとで何度もdocument.querySelectorを書かなくて済みます。
 const elements = {
   yearSelect: document.querySelector("#year-select"),
   quarterSelect: document.querySelector("#quarter-select"),
@@ -499,6 +514,11 @@ const metricKey = {
   net: "netIncome",
 };
 
+/**
+ * 概要: 百万円単位の数字を「億円」で読みやすく表示します。
+ * 引数: value - 表示したい数値。
+ * 戻り値: 整形済みの文字列。
+ */
 function formatBillions(value) {
   const totalOku = Math.floor(Math.abs(value) / 100);
   const sign = value < 0 && totalOku ? "-" : "";
@@ -544,6 +564,11 @@ function chartPeriodLabel(result) {
   return `FY${String(result.fiscalYear)} ${result.periodType}`;
 }
 
+/**
+ * 概要: 今選ばれている会社・年度・期間の決算データを取り出します。
+ * 引数: なし。
+ * 戻り値: 選択中の決算データ。見つからない場合はundefined。
+ */
 function activeResult() {
   return state.results.find((item) => item.id === state.activeId) ?? state.results.at(-1);
 }
@@ -560,6 +585,11 @@ function activeAnnualAnalysis() {
   return analysis && (!year || analysisYear === year) ? analysis : null;
 }
 
+/**
+ * 概要: 前年の同じ期間を探します。売上が増えたか減ったかを比べるためです。
+ * 引数: result - 比較元の決算データ。
+ * 戻り値: 前年同期間の決算データ。見つからない場合はundefined。
+ */
 function comparisonResult(result) {
   if (!result) return null;
   return state.results.find((item) => (
@@ -567,6 +597,11 @@ function comparisonResult(result) {
   )) ?? null;
 }
 
+/**
+ * 概要: 年度と期間の選択肢を、今あるデータに合わせて作り直します。
+ * 引数: なし。
+ * 戻り値: なし。
+ */
 function renderPicker() {
   const years = [...new Set(state.results.map((result) => result.fiscalYear))].sort((a, b) => b - a);
   const current = activeResult();
@@ -598,6 +633,11 @@ function usesPretaxMetric(result) {
     || (result?.operatingIncome === null && result?.pretaxIncome !== null);
 }
 
+/**
+ * 概要: 売上・費用・利益など、画面上部の大きな数字を表示します。
+ * 引数: なし。
+ * 戻り値: なし。
+ */
 function renderMetrics() {
   const current = activeResult();
   const usesPretaxIncome = usesPretaxMetric(current);
@@ -646,6 +686,11 @@ function renderMetrics() {
   elements.marginChange.style.color = pointChange >= 0 ? "var(--green)" : "var(--red)";
 }
 
+/**
+ * 概要: 公式IRサイトから見つけたPDFリンクを一覧にします。
+ * 引数: なし。
+ * 戻り値: なし。
+ */
 function renderDocuments() {
   const documents = state.officialIrDocumentsByCompany[state.companyCode];
   if (!documents) {
@@ -670,6 +715,11 @@ function renderDocuments() {
     .join("");
 }
 
+/**
+ * 概要: EDINETのXBRLから抜き出した元の数値を一覧にします。DB登録前後の確認にも使えます。
+ * 引数: なし。
+ * 戻り値: なし。
+ */
 function renderXbrlFacts() {
   if (!elements.xbrlFactsBody) return;
   const facts = state.edinetFactsByCompany[state.companyCode];
@@ -733,6 +783,11 @@ function officialDocumentQuarter(document) {
   return match ? `Q${match[1]}` : "—";
 }
 
+/**
+ * 概要: グラフをきれいに描くため、画面の解像度に合わせてcanvasの大きさを整えます。
+ * 引数: canvas - 描画対象のcanvas要素。
+ * 戻り値: canvasの2D描画コンテキスト、幅、高さ。
+ */
 function prepareCanvas(canvas) {
   const ratio = window.devicePixelRatio || 1;
   const rect = canvas.parentElement?.getBoundingClientRect() ?? canvas.getBoundingClientRect();
@@ -770,6 +825,11 @@ function clampedTextX(ctx, text, x, minX, maxX) {
   return Math.min(Math.max(x, minX + halfWidth), maxX - halfWidth);
 }
 
+/**
+ * 概要: 売上・費用・利益の推移グラフを描きます。
+ * 引数: なし。
+ * 戻り値: なし。
+ */
 function drawPerformanceChart() {
   const canvas = document.querySelector("#performance-chart");
   const results = activeYearResults();
@@ -853,6 +913,11 @@ function drawPerformanceChart() {
   });
 }
 
+/**
+ * 概要: 利益率の推移グラフを描きます。
+ * 引数: なし。
+ * 戻り値: なし。
+ */
 function drawMarginChart() {
   const canvas = document.querySelector("#margin-chart");
   const results = activeYearResults();
@@ -934,6 +999,11 @@ function drawMarginChart() {
   });
 }
 
+/**
+ * 概要: 営業利益から現金残高までの増減を、滝のようなグラフで描きます。
+ * 引数: なし。
+ * 戻り値: なし。
+ */
 function drawWaterfallChart() {
   const canvas = document.querySelector("#waterfall-chart");
   const analysis = activeAnnualAnalysis();
@@ -1069,6 +1139,11 @@ function calculateProfitCashAdjustment(analysis) {
   return analysis.cashAndCashEquivalents - analysis.previousCashAndCashEquivalents - disclosedChanges;
 }
 
+/**
+ * 概要: 年間の利益とキャッシュフローの説明パネルを更新します。
+ * 引数: なし。
+ * 戻り値: なし。
+ */
 function renderAnnualFlow() {
   const analysis = activeAnnualAnalysis();
   if (!analysis) {
@@ -1103,6 +1178,11 @@ function renderCharts() {
   drawWaterfallChart();
 }
 
+/**
+ * 概要: 株価データを折れ線グラフとして描きます。
+ * 引数: なし。
+ * 戻り値: なし。
+ */
 function drawStockChart() {
   const canvas = elements.stockChart;
   const prices = state.stockPrices;
@@ -1164,6 +1244,11 @@ function drawStockChart() {
   });
 }
 
+/**
+ * 概要: Worker経由で株価を取りに行き、取れたらグラフを描きます。
+ * 引数: なし。
+ * 戻り値: 株価表示の更新が終わったことを示すPromise。
+ */
 async function renderStockChart() {
   const symbol = state.stockChartSymbol;
   if (state.renderedStockChartSymbol === symbol) return;
@@ -1203,6 +1288,11 @@ async function renderStockChart() {
   }
 }
 
+/**
+ * 概要: 会社名、IRリンク、選択中の会社ボタンなどを更新します。
+ * 引数: なし。
+ * 戻り値: なし。
+ */
 function renderCompany() {
   const company = companies[state.companyCode];
   elements.companyName.textContent = company.name;
@@ -1214,6 +1304,11 @@ function renderCompany() {
   updateSyncButtonAvailability();
 }
 
+/**
+ * 概要: 画面全体をまとめて描き直します。データが変わった後は基本的にこれを呼びます。
+ * 引数: なし。
+ * 戻り値: なし。
+ */
 function render() {
   renderCompany();
   renderPicker();
@@ -1237,6 +1332,11 @@ function updateSyncButtonAvailability({ loading = false } = {}) {
   elements.syncButtonLabel.textContent = "更新";
 }
 
+/**
+ * 概要: 同期処理の進み具合をログとして残します。失敗した場所を後で見つけやすくします。
+ * 引数: level - ログ種別、stage - 処理段階、message - 表示文、companyCode - 対象会社コード。
+ * 戻り値: なし。
+ */
 function addSyncLog(level, stage, message, companyCode = state.companyCode) {
   state.syncLogs.unshift({
     level,
@@ -1301,6 +1401,11 @@ function apiHeaders(config) {
   };
 }
 
+/**
+ * 概要: fetchを少し便利にした関数です。時間切れやエラーを、画面に出しやすい形にします。
+ * 引数: url - 取得先URL、options - fetchの追加設定。
+ * 戻り値: JSONとして読み取ったレスポンスを返すPromise。
+ */
 async function fetchJson(url, options = {}) {
   const controller = new AbortController();
   const timeoutMs = options.timeoutMs ?? 15000;
@@ -1344,6 +1449,11 @@ async function fetchJsonWithSyncLog(url, options, { companyCode, stage, descript
   }
 }
 
+/**
+ * 概要: Supabaseに保存済みの決算データ・EDINETデータを読み込みます。
+ * 引数: companyCode - 対象会社コード、config - アプリ設定。
+ * 戻り値: 前回同期日時と期間データ件数を返すPromise。
+ */
 async function loadCachedCompanyData(companyCode, config) {
   addSyncLog("success", "DB読込開始", "保存済みデータと前回取得日時を確認します。", companyCode);
   const baseUrl = `${config.supabaseUrl}/rest/v1`;
@@ -1399,6 +1509,11 @@ async function loadCachedCompanyData(companyCode, config) {
   };
 }
 
+/**
+ * 概要: 会社の公式IRページから、決算PDFのリンク一覧を取りに行きます。
+ * 引数: companyCode - 対象会社コード。
+ * 戻り値: PDF一覧を含む結果を返すPromise。
+ */
 async function loadOfficialIrDocuments(companyCode) {
   addSyncLog("info", "公式IR資料取得 開始", "企業サイトからPDFリンクを確認します。", companyCode);
   try {
@@ -1413,6 +1528,11 @@ async function loadOfficialIrDocuments(companyCode) {
   }
 }
 
+/**
+ * 概要: EDINETから最近の書類とXBRL数値を取り、DBへ保存して画面用データへ変換します。
+ * 引数: companyCode - 対象会社コード、config - アプリ設定。
+ * 戻り値: 保存件数と変換件数を返すPromise。
+ */
 async function syncTodayEdinetDocuments(companyCode, config) {
   const configuredHistoryDays = Number(config.edinet?.historyDays);
   const configuredBatchDays = Number(config.edinet?.batchDays);
@@ -1475,6 +1595,11 @@ async function syncTodayEdinetDocuments(companyCode, config) {
   }
 }
 
+/**
+ * 概要: 初回だけ、config.jsonに書いた既知の日付からEDINETデータをまとめて取り込みます。
+ * 引数: companyCode - 対象会社コード。
+ * 戻り値: 実行有無、保存件数、変換件数を返すPromise。
+ */
 async function bootstrapEdinetDocuments(companyCode) {
   const dates = appConfig.edinet?.bootstrapDates?.[companyCode] ?? [];
   if (!dates.length) return { attempted: false, saved: 0, promoted: 0 };
@@ -1495,6 +1620,11 @@ async function bootstrapEdinetDocuments(companyCode) {
   return { attempted: true, saved, promoted };
 }
 
+/**
+ * 概要: 「今日すでに同期したか」を日本時間で判定します。
+ * 引数: value - 同期日時。
+ * 戻り値: 今日同期済みならtrue。
+ */
 function syncedToday(value) {
   if (!value) return false;
   const dateInJapan = (date) => new Intl.DateTimeFormat("en-CA", {
@@ -1506,6 +1636,11 @@ function syncedToday(value) {
   return dateInJapan(new Date(value)) === dateInJapan(new Date());
 }
 
+/**
+ * 概要: 会社を開いたときや更新ボタンを押したときの、データ更新の中心処理です。
+ * 引数: force - 同期を試すか、notify - トースト通知を出すか、bypassFreshness - 当日同期済み判定を無視するか。
+ * 戻り値: 更新処理が終わったことを示すPromise。
+ */
 async function refreshCompany({ force = false, notify = false, bypassFreshness = false } = {}) {
   const config = appConfig;
   const companyCode = state.companyCode;
@@ -1555,6 +1690,11 @@ async function refreshCompany({ force = false, notify = false, bypassFreshness =
   }
 }
 
+/**
+ * 概要: DBのsnake_caseと、画面で使うcamelCaseをそろえます。
+ * 引数: item - DBまたは画面由来の決算データ。
+ * 戻り値: 画面で使いやすい形に整えた決算データ。
+ */
 function normalizeResult(item) {
   return {
     id: item.id,
@@ -1624,6 +1764,7 @@ function normalizeAnnualFlow(item) {
   };
 }
 
+// ここから下は、ユーザー操作に反応するイベント設定です。
 elements.yearSelect.addEventListener("change", (event) => {
   const selectedYear = Number(event.target.value);
   const latestPeriod = state.results.filter((result) => result.fiscalYear === selectedYear).at(-1);
@@ -1665,6 +1806,7 @@ window.addEventListener("resize", () => {
   if (state.stockPrices.length) drawStockChart();
 });
 
+// ページを開いた直後に、まず予備データで描画してから最新データを取りに行きます。
 updateLatestUpdate();
 render();
 refreshCompany({ force: true });
