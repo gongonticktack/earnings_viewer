@@ -60,6 +60,47 @@ const xbrlFactDefinitions = [
   { concept: "Equity", label: "Equity", order: 72 },
 ];
 const xbrlFactDefinitionByConcept = new Map(xbrlFactDefinitions.map((definition) => [definition.concept, definition]));
+const revenueConcepts = [
+  "RevenueIFRSSummaryOfBusinessResults", "Revenue", "NetSalesSummaryOfBusinessResults", "NetSales", "OperatingRevenue",
+];
+const operatingIncomeConcepts = [
+  "OperatingProfitLossIFRSSummaryOfBusinessResults", "OperatingIncomeLossSummaryOfBusinessResults", "OperatingIncome",
+];
+const pretaxIncomeConcepts = ["ProfitLossBeforeTaxIFRSSummaryOfBusinessResults", "ProfitLossBeforeTax"];
+const netIncomeConcepts = [
+  "ProfitLossAttributableToOwnersOfParentIFRSSummaryOfBusinessResults",
+  "ProfitLossAttributableToOwnersOfParent",
+  "NetIncomeLossSummaryOfBusinessResults",
+  "NetIncomeLoss",
+  "ProfitLossSummaryOfBusinessResults",
+  "ProfitLoss",
+];
+const cashConcepts = ["CashAndCashEquivalentsIFRS", "CashAndCashEquivalents"];
+const supabaseUrl = config.supabase?.url;
+const supabaseKey = config.supabase?.key;
+
+function hasSupabaseConfig() {
+  return Boolean(supabaseUrl && supabaseKey);
+}
+
+function requireEdinetApiKey() {
+  const apiKey = config.edinet?.apiKey;
+  if (!apiKey) {
+    throw new Error("EDINET API key is not configured. Set edinet.apiKey in config.json.");
+  }
+  return apiKey;
+}
+
+function supabaseHeaders(prefer = null) {
+  const headers = {
+    apikey: supabaseKey,
+    Authorization: `Bearer ${supabaseKey}`,
+    "Content-Type": "application/json",
+  };
+  if (prefer) headers.Prefer = prefer;
+  return headers;
+}
+
 const irSources = {
   kioxia: {
     sourcePage: "https://www.kioxia-holdings.com/ja-jp/ir/library/data.html",
@@ -205,11 +246,8 @@ function edinetUrl(path, apiKey, params = {}) {
   return url;
 }
 
-async function fetchEdinetDocumentList(env, date) {
-  const apiKey = env.EDINET_API_KEY ?? config.edinet?.apiKey;
-  if (!apiKey) {
-    throw new Error("EDINET API key is not configured. Set edinet.apiKey in config.json or register EDINET_API_KEY as a Cloudflare Worker secret.");
-  }
+async function fetchEdinetDocumentList(_env, date) {
+  const apiKey = requireEdinetApiKey();
   const response = await fetch(edinetUrl("/documents.json", apiKey, { date, type: "2" }), {
     headers: { "User-Agent": "earnings-viewer/1.0" },
   });
@@ -268,11 +306,8 @@ function filterEdinetDocuments(documents, requestedCompanyCode = null) {
   return [...new Map(filtered.map((document) => [document.id, document])).values()];
 }
 
-async function fetchEdinetXbrlArchive(env, documentId) {
-  const apiKey = env.EDINET_API_KEY ?? config.edinet?.apiKey;
-  if (!apiKey) {
-    throw new Error("EDINET API key is not configured. Set edinet.apiKey in config.json or register EDINET_API_KEY as a Cloudflare Worker secret.");
-  }
+async function fetchEdinetXbrlArchive(_env, documentId) {
+  const apiKey = requireEdinetApiKey();
   const response = await fetch(edinetUrl(`/documents/${documentId}`, apiKey, { type: "1" }), {
     headers: { "User-Agent": "earnings-viewer/1.0" },
   });
@@ -406,22 +441,17 @@ async function extractEdinetFacts(env, document) {
     && !name.toLowerCase().includes("audit")
   ));
   const primary = files.find((file) => /jpcrp|jppfs|ifrs/i.test(file.name)) ?? files[0];
-  return primary ? parseXbrlFacts(document, primary.text).slice(0, 80) : [];
+  return primary ? parseXbrlFacts(document, primary.text) : [];
 }
 
 async function saveEdinetDocuments(env, documents) {
   if (!documents.length) return true;
-  if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY) {
+  if (!hasSupabaseConfig()) {
     return false;
   }
-  const response = await fetch(`${env.SUPABASE_URL}/rest/v1/earn_edinet_documents?on_conflict=id`, {
+  const response = await fetch(`${supabaseUrl}/rest/v1/earn_edinet_documents?on_conflict=id`, {
     method: "POST",
-    headers: {
-      apikey: env.SUPABASE_SERVICE_ROLE_KEY,
-      Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
-      "Content-Type": "application/json",
-      Prefer: "resolution=merge-duplicates,return=minimal",
-    },
+    headers: supabaseHeaders("resolution=merge-duplicates,return=minimal"),
     body: JSON.stringify(documents),
   });
   if (!response.ok) {
@@ -433,17 +463,12 @@ async function saveEdinetDocuments(env, documents) {
 
 async function saveEdinetFacts(env, facts) {
   if (!facts.length) return true;
-  if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY) {
+  if (!hasSupabaseConfig()) {
     return false;
   }
-  const response = await fetch(`${env.SUPABASE_URL}/rest/v1/earn_edinet_facts?on_conflict=id`, {
+  const response = await fetch(`${supabaseUrl}/rest/v1/earn_edinet_facts?on_conflict=id`, {
     method: "POST",
-    headers: {
-      apikey: env.SUPABASE_SERVICE_ROLE_KEY,
-      Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
-      "Content-Type": "application/json",
-      Prefer: "resolution=merge-duplicates,return=minimal",
-    },
+    headers: supabaseHeaders("resolution=merge-duplicates,return=minimal"),
     body: JSON.stringify(facts),
   });
   if (!response.ok) {
@@ -453,11 +478,235 @@ async function saveEdinetFacts(env, facts) {
   return true;
 }
 
-async function syncEdinetDocuments(request, env) {
-  if (env.SYNC_TOKEN && request.headers.get("Authorization") !== `Bearer ${env.SYNC_TOKEN}`) {
-    return jsonError("Unauthorized", 401);
+async function fetchAllSupabaseRows(env, table, query) {
+  const rows = [];
+  const pageSize = 1000;
+  for (let start = 0; ; start += pageSize) {
+    const response = await fetch(`${supabaseUrl}/rest/v1/${table}?${query}`, {
+      headers: {
+        ...supabaseHeaders(),
+        Range: `${start}-${start + pageSize - 1}`,
+        "Range-Unit": "items",
+        Prefer: "count=exact",
+      },
+    });
+    if (!response.ok) {
+      const detail = await response.text();
+      throw new Error(`Supabase ${table} read failed (${response.status}): ${detail.slice(0, 500)}`);
+    }
+    const page = await response.json();
+    rows.push(...page);
+    if (page.length < pageSize) return rows;
   }
+}
+
+async function upsertSupabaseRows(env, table, conflictColumns, rows) {
+  if (!rows.length) return;
+  const response = await fetch(
+    `${supabaseUrl}/rest/v1/${table}?on_conflict=${encodeURIComponent(conflictColumns)}`,
+    {
+      method: "POST",
+      headers: supabaseHeaders("resolution=merge-duplicates,return=minimal"),
+      body: JSON.stringify(rows),
+    },
+  );
+  if (!response.ok) {
+    const detail = await response.text();
+    throw new Error(`Supabase ${table} promotion failed (${response.status}): ${detail.slice(0, 500)}`);
+  }
+}
+
+function durationDays(start, end) {
+  if (!start || !end) return null;
+  return Math.round((Date.parse(`${end}T00:00:00Z`) - Date.parse(`${start}T00:00:00Z`)) / 86400000);
+}
+
+function quarterForDocument(document) {
+  const days = durationDays(document.period_start, document.period_end);
+  if (days === null || days < 45 || days > 380) return null;
+  if (days <= 110) return 1;
+  if (days <= 200) return 2;
+  if (days <= 290) return 3;
+  return 4;
+}
+
+function contextScore(contextRef = "") {
+  const value = contextRef.toLowerCase();
+  let score = 0;
+  if (value.includes("currentyear")) score += 20;
+  if (value.includes("duration") || value.includes("instant")) score += 8;
+  if (value.includes("consolidated")) score += 4;
+  if (value.includes("nonconsolidated") || value.includes("non-consolidated")) score -= 30;
+  if (value.includes("member") || value.includes("segment")) score -= 10;
+  return score;
+}
+
+function metricValue(facts, concepts, periodStart, periodEnd, instant = false) {
+  for (const concept of concepts) {
+    const candidates = facts
+      .filter((fact) => fact.concept === concept
+        && fact.period_end === periodEnd
+        && (instant || fact.period_start === periodStart)
+        && Number.isFinite(Number(fact.value)))
+      .sort((a, b) => contextScore(b.context_ref) - contextScore(a.context_ref));
+    if (candidates.length) return Number(candidates[0].value) / 1000000;
+  }
+  return null;
+}
+
+function latestDocumentsByPeriod(documents) {
+  const fiscalEndMonths = new Map();
+  for (const document of documents) {
+    if (quarterForDocument(document) === 4) {
+      fiscalEndMonths.set(document.company_code, Number(document.period_end.slice(5, 7)));
+    }
+  }
+  const latest = new Map();
+  for (const document of documents) {
+    const quarter = quarterForDocument(document);
+    if (!quarter) continue;
+    const startYear = Number(document.period_start.slice(0, 4));
+    const startMonth = Number(document.period_start.slice(5, 7));
+    const fiscalEndMonth = fiscalEndMonths.get(document.company_code) ?? 3;
+    const fiscalYear = quarter === 4
+      ? Number(document.period_end.slice(0, 4))
+      : startYear + (fiscalEndMonth < startMonth ? 1 : 0);
+    const key = `${document.company_code}:${fiscalYear}:${quarter}`;
+    const existing = latest.get(key);
+    if (!existing || `${document.submitted_at}:${document.id}` > `${existing.submitted_at}:${existing.id}`) {
+      latest.set(key, { ...document, fiscalYear, quarter });
+    }
+  }
+  return [...latest.values()];
+}
+
+function buildDashboardRows(documents, facts) {
+  const factsByDocument = new Map();
+  for (const fact of facts) {
+    if (!factsByDocument.has(fact.document_id)) factsByDocument.set(fact.document_id, []);
+    factsByDocument.get(fact.document_id).push(fact);
+  }
+
+  const cumulative = latestDocumentsByPeriod(documents).map((document) => {
+    const documentFacts = factsByDocument.get(document.id) ?? [];
+    return {
+      ...document,
+      revenue: metricValue(documentFacts, revenueConcepts, document.period_start, document.period_end),
+      operatingIncome: metricValue(documentFacts, operatingIncomeConcepts, document.period_start, document.period_end),
+      pretaxIncome: metricValue(documentFacts, pretaxIncomeConcepts, document.period_start, document.period_end),
+      netIncome: metricValue(documentFacts, netIncomeConcepts, document.period_start, document.period_end),
+      operatingCashFlow: metricValue(documentFacts, ["NetCashProvidedByUsedInOperatingActivities"], document.period_start, document.period_end),
+      investingCashFlow: metricValue(documentFacts, ["NetCashProvidedByUsedInInvestingActivities"], document.period_start, document.period_end),
+      financingCashFlow: metricValue(documentFacts, ["NetCashProvidedByUsedInFinancingActivities"], document.period_start, document.period_end),
+      cash: metricValue(documentFacts, cashConcepts, document.period_start, document.period_end, true),
+    };
+  }).sort((a, b) => (
+    a.company_code.localeCompare(b.company_code)
+    || a.fiscalYear - b.fiscalYear
+    || a.quarter - b.quarter
+  ));
+
+  const cumulativeByPeriod = new Map(cumulative.map((row) => [
+    `${row.company_code}:${row.fiscalYear}:${row.quarter}`,
+    row,
+  ]));
+  const quarterlyResults = [];
+  for (const row of cumulative) {
+    const previous = row.quarter === 1
+      ? null
+      : cumulativeByPeriod.get(`${row.company_code}:${row.fiscalYear}:${row.quarter - 1}`);
+    if (row.quarter > 1 && !previous) continue;
+    const standalone = (value, previousValue) => {
+      if (value === null || (row.quarter > 1 && previousValue === null)) return null;
+      return row.quarter === 1 ? value : value - previousValue;
+    };
+    const revenue = standalone(row.revenue, previous?.revenue);
+    const operatingIncome = standalone(row.operatingIncome, previous?.operatingIncome);
+    const pretaxIncome = standalone(row.pretaxIncome, previous?.pretaxIncome);
+    const netIncome = standalone(row.netIncome, previous?.netIncome);
+    if (revenue === null || netIncome === null) continue;
+    quarterlyResults.push({
+      id: `edinet-${row.id}`,
+      company_code: row.company_code,
+      fiscal_year: row.fiscalYear,
+      quarter: row.quarter,
+      period_end: row.period_end,
+      revenue: Math.round(revenue),
+      operating_cost: operatingIncome === null ? null : Math.round(revenue - operatingIncome),
+      operating_income: operatingIncome === null ? null : Math.round(operatingIncome),
+      pretax_income: pretaxIncome === null ? null : Math.round(pretaxIncome),
+      net_income: Math.round(netIncome),
+      source_url: "https://disclosure2.edinet-fsa.go.jp/",
+      synced_at: new Date().toISOString(),
+    });
+  }
+
+  const annualRows = cumulative.filter((row) => row.quarter === 4);
+  const annualByCompanyYear = new Map(annualRows.map((row) => [`${row.company_code}:${row.fiscalYear}`, row]));
+  const annualFlows = [];
+  for (const current of annualRows) {
+    const previous = annualByCompanyYear.get(`${current.company_code}:${current.fiscalYear - 1}`);
+    if (!previous
+      || current.revenue === null || current.operatingIncome === null || current.investingCashFlow === null
+      || previous.revenue === null || previous.operatingIncome === null) continue;
+    annualFlows.push({
+      id: `edinet-annual-${current.id}`,
+      company_code: current.company_code,
+      previous_fiscal_year: `FY${previous.fiscalYear}`,
+      current_fiscal_year: `FY${current.fiscalYear}`,
+      previous_revenue: Math.round(previous.revenue),
+      current_revenue: Math.round(current.revenue),
+      previous_operating_cost: Math.round(previous.revenue - previous.operatingIncome),
+      current_operating_cost: Math.round(current.revenue - current.operatingIncome),
+      previous_operating_income: Math.round(previous.operatingIncome),
+      current_operating_income: Math.round(current.operatingIncome),
+      operating_cash_flow: current.operatingCashFlow === null ? null : Math.round(current.operatingCashFlow),
+      investing_cash_flow: Math.round(current.investingCashFlow),
+      financing_cash_flow: current.financingCashFlow === null ? null : Math.round(current.financingCashFlow),
+      previous_cash_and_cash_equivalents: previous.cash === null ? null : Math.round(previous.cash),
+      cash_and_cash_equivalents: current.cash === null ? null : Math.round(current.cash),
+      expense_breakdown: [],
+      source_url: "https://disclosure2.edinet-fsa.go.jp/",
+      synced_at: new Date().toISOString(),
+    });
+  }
+  return { quarterlyResults, annualFlows };
+}
+
+async function promoteEdinetFacts(env, companyCodes) {
+  if (!companyCodes.length || !hasSupabaseConfig()) {
+    return { quarterlyResults: 0, annualFlows: 0 };
+  }
+  const companyFilter = `(${companyCodes.join(",")})`;
+  const [documents, facts] = await Promise.all([
+    fetchAllSupabaseRows(env, "earn_edinet_documents", `company_code=in.${encodeURIComponent(companyFilter)}&select=*`),
+    fetchAllSupabaseRows(env, "earn_edinet_facts", `company_code=in.${encodeURIComponent(companyFilter)}&select=*`),
+  ]);
+  const rows = buildDashboardRows(documents, facts);
+  await upsertSupabaseRows(env, "earn_quarterly_results", "company_code,fiscal_year,quarter", rows.quarterlyResults);
+  await upsertSupabaseRows(env, "earn_annual_profit_flows", "company_code,current_fiscal_year", rows.annualFlows);
+
+  const response = await fetch(
+    `${supabaseUrl}/rest/v1/earn_companies?code=in.${encodeURIComponent(companyFilter)}`,
+    {
+      method: "PATCH",
+      headers: supabaseHeaders("return=minimal"),
+      body: JSON.stringify({ last_synced_at: new Date().toISOString() }),
+    },
+  );
+  if (!response.ok) {
+    const detail = await response.text();
+    throw new Error(`Supabase company sync timestamp update failed (${response.status}): ${detail.slice(0, 500)}`);
+  }
+  return { quarterlyResults: rows.quarterlyResults.length, annualFlows: rows.annualFlows.length };
+}
+
+async function syncEdinetDocuments(request, env) {
   const url = new URL(request.url);
+  const requestedCompanyCode = url.searchParams.get("company");
+  if (requestedCompanyCode && !edinetCompanies[requestedCompanyCode]) {
+    return jsonError("Company is not configured", 404);
+  }
   let dates;
   try {
     dates = requestedEdinetDates(url);
@@ -469,7 +718,7 @@ async function syncEdinetDocuments(request, env) {
   try {
     const documentLists = [];
     for (const date of dates) documentLists.push(...await fetchEdinetDocumentList(env, date));
-    documents = filterEdinetDocuments(documentLists);
+    documents = filterEdinetDocuments(documentLists, requestedCompanyCode);
   } catch (error) {
     return Response.json({
       dates,
@@ -494,10 +743,14 @@ async function syncEdinetDocuments(request, env) {
 
   let persisted = false;
   let factsPersisted = false;
+  let promoted = { quarterlyResults: 0, annualFlows: 0 };
   let persistenceError = null;
   try {
     persisted = await saveEdinetDocuments(env, documents);
     factsPersisted = await saveEdinetFacts(env, facts);
+    if (persisted && factsPersisted) {
+      promoted = await promoteEdinetFacts(env, [...new Set(documents.map((document) => document.company_code))]);
+    }
   } catch (error) {
     persistenceError = error instanceof Error ? error.message : String(error);
   }
@@ -507,6 +760,7 @@ async function syncEdinetDocuments(request, env) {
     factsSaved: factsPersisted ? facts.length : 0,
     persisted,
     factsPersisted,
+    promoted,
     persistenceError,
     xbrlErrors,
     documents,
@@ -648,20 +902,4 @@ export default {
     }
   },
 
-  async scheduled(_controller, env) {
-    const date = jstDate();
-    const documents = filterEdinetDocuments(await fetchEdinetDocumentList(env, date));
-    const persisted = await saveEdinetDocuments(env, documents);
-    const facts = [];
-    for (const document of documents) {
-      try {
-        facts.push(...await extractEdinetFacts(env, document));
-      } catch {
-        // Keep the scheduled metadata sync alive even when an individual XBRL package is unavailable.
-      }
-    }
-    const factsPersisted = await saveEdinetFacts(env, facts);
-    if (!persisted) throw new Error("SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY is not configured");
-    if (!factsPersisted) throw new Error("SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY is not configured");
-  },
 };

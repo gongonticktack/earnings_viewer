@@ -1,4 +1,35 @@
-import "./config.js";
+const defaultAppConfig = {
+  supabaseUrl: "",
+  supabaseAnonKey: "",
+  api: {
+    stocks: "/api/stocks",
+    officialIr: "/api/ir",
+    edinetSync: "/api/edinet/sync",
+  },
+  edinet: {
+    historyDays: 400,
+    batchDays: 31,
+  },
+};
+
+async function loadAppConfig() {
+  try {
+    const response = await fetch(new URL("./config.json", import.meta.url));
+    if (!response.ok) throw new Error(`config.json could not be loaded (${response.status})`);
+    const data = await response.json();
+    return {
+      supabaseUrl: data.supabase?.url ?? defaultAppConfig.supabaseUrl,
+      supabaseAnonKey: data.supabase?.key ?? defaultAppConfig.supabaseAnonKey,
+      api: { ...defaultAppConfig.api, ...data.api },
+      edinet: { ...defaultAppConfig.edinet, ...data.edinet },
+    };
+  } catch (error) {
+    console.warn("config.jsonの読み込みに失敗したため、既定値を使用します。", error);
+    return defaultAppConfig;
+  }
+}
+
+const appConfig = await loadAppConfig();
 
 const companies = {
   kioxia: {
@@ -707,8 +738,16 @@ function drawPerformanceChart() {
   const gap = chartWidth / results.length;
   const barWidth = Math.min(47, gap * 0.38);
   const visibleLabelIndexes = labelIndexesForWidth(results.length, chartWidth, 64);
+  const activeIndex = results.findIndex((result) => result.id === state.activeId);
 
   ctx.clearRect(0, 0, width, height);
+  if (activeIndex >= 0) {
+    const activeX = padding.left + gap * activeIndex;
+    ctx.fillStyle = "rgba(214, 183, 122, .075)";
+    ctx.fillRect(activeX, padding.top, gap, chartHeight);
+    ctx.fillStyle = "rgba(214, 183, 122, .75)";
+    ctx.fillRect(activeX, padding.top, gap, 2);
+  }
   ctx.font = '600 9px "Manrope"';
   ctx.strokeStyle = "rgba(224, 205, 165, .10)";
   ctx.fillStyle = "#77756e";
@@ -734,8 +773,9 @@ function drawPerformanceChart() {
     ctx.fillStyle = gradient;
     ctx.fillRect(x - barWidth / 2, y, barWidth, barHeight);
 
-    ctx.fillStyle = "#77756e";
+    ctx.fillStyle = index === activeIndex ? "#d6b77a" : "#77756e";
     ctx.textAlign = "center";
+    ctx.font = `${index === activeIndex ? "800" : "600"} 9px "Manrope"`;
     if (visibleLabelIndexes.has(index)) {
       const label = chartQuarterLabel(result);
       ctx.fillText(label, clampedTextX(ctx, label, x, padding.left, width - padding.right), height - 7);
@@ -754,13 +794,13 @@ function drawPerformanceChart() {
   });
   ctx.stroke();
 
-  points.forEach((point) => {
+  points.forEach((point, index) => {
     ctx.beginPath();
-    ctx.arc(point.x, point.y, 3, 0, Math.PI * 2);
+    ctx.arc(point.x, point.y, index === activeIndex ? 5 : 3, 0, Math.PI * 2);
     ctx.fillStyle = "#171914";
     ctx.fill();
-    ctx.strokeStyle = "#82ba8e";
-    ctx.lineWidth = 2;
+    ctx.strokeStyle = index === activeIndex ? "#d6b77a" : "#82ba8e";
+    ctx.lineWidth = index === activeIndex ? 3 : 2;
     ctx.stroke();
   });
 }
@@ -779,12 +819,25 @@ function drawMarginChart() {
   const margins = results.map((item) => (profitValue(item) / item.revenue) * 100);
   const max = Math.max(...margins) * 1.14;
   const visibleLabelIndexes = labelIndexesForWidth(margins.length, chartWidth, 66);
+  const activeIndex = results.findIndex((result) => result.id === state.activeId);
   const points = margins.map((margin, index) => ({
     x: margins.length === 1 ? padding.left + chartWidth / 2 : padding.left + (chartWidth / (margins.length - 1)) * index,
     y: padding.top + chartHeight - (margin / max) * chartHeight,
   }));
 
   ctx.clearRect(0, 0, width, height);
+  if (activeIndex >= 0) {
+    const activeX = points[activeIndex].x;
+    ctx.fillStyle = "rgba(214, 183, 122, .075)";
+    ctx.fillRect(Math.max(padding.left, activeX - 24), padding.top, 48, chartHeight);
+    ctx.strokeStyle = "rgba(214, 183, 122, .4)";
+    ctx.setLineDash([3, 4]);
+    ctx.beginPath();
+    ctx.moveTo(activeX, padding.top);
+    ctx.lineTo(activeX, padding.top + chartHeight);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
   ctx.strokeStyle = "rgba(224, 205, 165, .10)";
   ctx.lineWidth = 1;
   for (let index = 0; index < 3; index += 1) {
@@ -817,14 +870,15 @@ function drawMarginChart() {
 
   points.forEach((point, index) => {
     ctx.beginPath();
-    ctx.arc(point.x, point.y, 3, 0, Math.PI * 2);
+    ctx.arc(point.x, point.y, index === activeIndex ? 5 : 3, 0, Math.PI * 2);
     ctx.fillStyle = "#171914";
     ctx.fill();
-    ctx.strokeStyle = "#82ba8e";
+    ctx.strokeStyle = index === activeIndex ? "#d6b77a" : "#82ba8e";
+    ctx.lineWidth = index === activeIndex ? 3 : 2;
     ctx.stroke();
-    ctx.fillStyle = "#77756e";
+    ctx.fillStyle = index === activeIndex ? "#d6b77a" : "#77756e";
     ctx.textAlign = "center";
-    ctx.font = '600 9px "Manrope"';
+    ctx.font = `${index === activeIndex ? "800" : "600"} 9px "Manrope"`;
     if (visibleLabelIndexes.has(index)) {
       const label = chartQuarterLabel(results[index]);
       ctx.fillText(label, clampedTextX(ctx, label, point.x, padding.left, width - padding.right), height - 7);
@@ -1069,11 +1123,11 @@ async function renderStockChart() {
   elements.stockChartStatus.textContent = `${symbol} の週足を読み込んでいます。`;
 
   try {
-    const payload = await fetchJson(`${window.APP_CONFIG.api.stocks}/${encodeURIComponent(symbol)}`);
+    const payload = await fetchJson(`${appConfig.api.stocks}/${encodeURIComponent(symbol)}`);
     const result = payload.chart?.result?.[0];
     const timestamps = result?.timestamp ?? [];
     const quotes = result?.indicators?.quote?.[0] ?? {};
-    state.stockPrices = timestamps
+    const stockPrices = timestamps
       .map((timestamp, index) => ({
         date: new Date(timestamp * 1000).toISOString().slice(0, 10),
         open: quotes.open?.[index],
@@ -1082,10 +1136,15 @@ async function renderStockChart() {
         close: quotes.close?.[index],
       }))
       .filter((item) => [item.open, item.high, item.low, item.close].every(Number.isFinite));
-    if (!state.stockPrices.length) throw new Error("株価データがありません。");
+    if (state.stockChartSymbol !== symbol) return;
+    if (!stockPrices.length) throw new Error("株価データがありません。");
+    state.stockPrices = stockPrices;
     elements.stockChartStatus.textContent = `${symbol} / 週足ローソク / 過去2年`;
     drawStockChart();
   } catch (error) {
+    if (state.stockChartSymbol !== symbol) return;
+    state.renderedStockChartSymbol = null;
+    state.stockPrices = [];
     const { context: ctx, width, height } = prepareCanvas(elements.stockChart);
     ctx.clearRect(0, 0, width, height);
     ctx.fillStyle = "#9b998f";
@@ -1196,9 +1255,11 @@ function apiHeaders(config) {
 
 async function fetchJson(url, options = {}) {
   const controller = new AbortController();
-  const timeout = window.setTimeout(() => controller.abort(), 15000);
+  const timeoutMs = options.timeoutMs ?? 15000;
+  const timeout = window.setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const response = await fetch(url, { ...options, signal: options.signal ?? controller.signal });
+    const { timeoutMs: _timeoutMs, ...fetchOptions } = options;
+    const response = await fetch(url, { ...fetchOptions, signal: options.signal ?? controller.signal });
     if (!response.ok) {
       const payload = await response.json().catch(() => ({}));
       const detail = payload.error ?? payload.message;
@@ -1212,7 +1273,7 @@ async function fetchJson(url, options = {}) {
     return text ? JSON.parse(text) : null;
   } catch (error) {
     if (error.name === "AbortError") {
-      throw new Error(`15秒以内に応答がありません @ ${new URL(url, window.location.href).pathname}`);
+      throw new Error(`${Math.round(timeoutMs / 1000)}秒以内に応答がありません @ ${new URL(url, window.location.href).pathname}`);
     }
     throw error;
   } finally {
@@ -1290,7 +1351,7 @@ async function loadCachedCompanyData(companyCode, config) {
 async function loadOfficialIrDocuments(companyCode) {
   addSyncLog("info", "公式IR資料取得 開始", "企業サイトからPDFリンクを確認します。", companyCode);
   try {
-    const payload = await fetchJson(`${window.APP_CONFIG.api.officialIr}/${encodeURIComponent(companyCode)}`);
+    const payload = await fetchJson(`${appConfig.api.officialIr}/${encodeURIComponent(companyCode)}`);
     state.officialIrDocumentsByCompany[companyCode] = payload.documents ?? [];
     addSyncLog("success", "公式IR資料取得 完了", `${payload.documents?.length ?? 0}件のPDFリンクを読み込みました。`, companyCode);
     return payload;
@@ -1312,6 +1373,7 @@ async function syncTodayEdinetDocuments(companyCode, config) {
     : 31;
   const batches = Math.ceil(historyDays / batchDays);
   let saved = 0;
+  let promoted = 0;
   addSyncLog("info", "EDINET同期 開始", `金融庁EDINET APIから過去${historyDays}日分の対象企業の書類を取得し、DBへ保存します。`, companyCode);
   try {
     for (let index = 0; index < batches; index += 1) {
@@ -1319,7 +1381,10 @@ async function syncTodayEdinetDocuments(companyCode, config) {
       date.setUTCDate(date.getUTCDate() - index * batchDays);
       const days = Math.min(batchDays, historyDays - index * batchDays);
       const endDate = date.toISOString().slice(0, 10);
-      const payload = await fetchJson(`${window.APP_CONFIG.api.edinetSync}?date=${endDate}&days=${days}`, { method: "POST" });
+      const payload = await fetchJson(
+        `${appConfig.api.edinetSync}?date=${endDate}&days=${days}&company=${encodeURIComponent(companyCode)}`,
+        { method: "POST", timeoutMs: 120000 },
+      );
       if (payload.edinetError) {
         addSyncLog("error", "EDINET同期 失敗", payload.edinetError, companyCode);
         return { ...payload, saved, edinetSyncFailed: true };
@@ -1347,11 +1412,12 @@ async function syncTodayEdinetDocuments(companyCode, config) {
       if (payload.persistenceError) {
         addSyncLog("error", "Worker保存 失敗", payload.persistenceError, companyCode);
       }
+      promoted += payload.promoted?.quarterlyResults ?? 0;
       saved += payload.facts?.length ?? payload.documents?.length ?? 0;
     }
-    addSyncLog("success", "EDINET同期 完了", `${saved}件のXBRLデータをDBへ保存しました。`, companyCode);
+    addSyncLog("success", "EDINET同期 完了", `${saved}件のXBRLデータを保存し、${promoted}件の四半期データを更新しました。`, companyCode);
     await loadCachedCompanyData(companyCode, config);
-    return { saved };
+    return { saved, promoted };
   } catch (error) {
     addSyncLog("error", "EDINET同期 失敗", error.message, companyCode);
     return { saved: 0, edinetSyncFailed: true };
@@ -1359,7 +1425,7 @@ async function syncTodayEdinetDocuments(companyCode, config) {
 }
 
 async function refreshCompany({ force = false, notify = false } = {}) {
-  const config = window.APP_CONFIG ?? {};
+  const config = appConfig;
   const companyCode = state.companyCode;
   elements.syncButton.classList.add("loading");
   updateSyncButtonAvailability({ loading: true });
@@ -1372,14 +1438,10 @@ async function refreshCompany({ force = false, notify = false } = {}) {
       return;
     }
 
-    if (force) {
-      await loadCachedCompanyData(companyCode, config);
-    } else {
-      await Promise.all([
-        loadCachedCompanyData(companyCode, config),
-        loadOfficialIrDocuments(companyCode),
-      ]);
-    }
+    await Promise.all([
+      loadCachedCompanyData(companyCode, config),
+      loadOfficialIrDocuments(companyCode),
+    ]);
     const payload = force ? await syncTodayEdinetDocuments(companyCode, config) : null;
 
     if (state.companyCode === companyCode) {
@@ -1393,7 +1455,7 @@ async function refreshCompany({ force = false, notify = false } = {}) {
         payload?.edinetSyncFailed
           ? "公式IR PDF一覧を更新しました。EDINET同期の詳細はSync Logを確認してください。"
           : payload
-          ? `${payload.saved}件のEDINET書類を保存しました。`
+          ? `${payload.saved}件のXBRL数値を保存し、${payload.promoted}件の四半期データを更新しました。`
           : "保存済みの最新データを表示しています。",
       );
     }
@@ -1488,6 +1550,7 @@ elements.quarterSelect.addEventListener("change", (event) => {
   state.activeId = event.target.value;
   renderMetrics();
   renderDocuments();
+  renderCharts();
 });
 elements.companyButtons.forEach((button) => {
   button.addEventListener("click", async () => {
@@ -1512,4 +1575,4 @@ window.addEventListener("resize", () => {
 
 updateLatestUpdate();
 render();
-refreshCompany();
+refreshCompany({ force: true });
