@@ -35,3 +35,13 @@ python -m http.server 5173
 - `earn_companies`: 会社マスタ
 - `earn_quarterly_results`: 四半期業績
 - `earn_ir_documents`: 公式IR PDFリンク
+
+## Cloudflare Workers deploy
+
+This app is a static site. `wrangler.jsonc` deploys the repository root as static assets, so no build command such as `npx hugo` is required.
+
+```powershell
+npx wrangler deploy
+```
+
+Files that should not be published, such as `schema.sql` and repository metadata, are excluded by `.assetsignore`.

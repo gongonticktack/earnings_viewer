@@ -91,6 +91,27 @@ create policy "Earn quarterly results are public"
 create index if not exists earn_quarterly_results_company_period_idx
   on public.earn_quarterly_results (company_code, period_end desc);
 
+create or replace view public.earn_period_results as
+select
+  id,
+  company_code,
+  fiscal_year,
+  quarter,
+  ('Q' || quarter::text) as period_type,
+  null::date as period_start,
+  period_end,
+  revenue,
+  operating_cost,
+  operating_income,
+  pretax_income,
+  net_income,
+  source_url,
+  created_at,
+  updated_at
+from public.earn_quarterly_results;
+
+grant select on public.earn_period_results to anon, authenticated;
+
 create table if not exists public.earn_ir_documents (
   id text primary key,
   company_code text not null references public.earn_companies(code) on delete cascade,
