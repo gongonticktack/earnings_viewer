@@ -57,11 +57,15 @@ create policy "Earn companies can update sync time"
 revoke update on public.earn_companies from anon, authenticated;
 grant update (last_synced_at) on public.earn_companies to anon, authenticated;
 
-create table if not exists public.earn_quarterly_results (
+-- 旧 earn_quarterly_results は既存データ保護のため自動削除しないが、アプリからは使用しない。
+-- EDINETの現行提出単位に合わせた累計期間データ。
+-- H1は上期累計、FYは通期累計であり、単独四半期値には変換しない。
+create table if not exists public.earn_period_results (
   id text primary key,
   company_code text not null references public.earn_companies(code),
   fiscal_year integer not null,
-  quarter integer not null check (quarter between 1 and 4),
+  period_type text not null check (period_type in ('H1', 'FY')),
+  period_start date not null,
   period_end date not null,
   revenue bigint not null,
   operating_cost bigint,
@@ -70,42 +74,37 @@ create table if not exists public.earn_quarterly_results (
   net_income bigint not null,
   source_url text not null,
   synced_at timestamptz not null default now(),
-  unique (company_code, fiscal_year, quarter)
+  unique (company_code, fiscal_year, period_type)
 );
 
-alter table public.earn_quarterly_results
-  alter column operating_cost drop not null,
-  alter column operating_income drop not null,
-  add column if not exists pretax_income bigint;
+alter table public.earn_period_results enable row level security;
 
-alter table public.earn_quarterly_results enable row level security;
-
-drop policy if exists "Earn quarterly results are public" on public.earn_quarterly_results;
-create policy "Earn quarterly results are public"
-  on public.earn_quarterly_results
+drop policy if exists "Earn period results are public" on public.earn_period_results;
+create policy "Earn period results are public"
+  on public.earn_period_results
   for select
   to anon, authenticated
   using (true);
 
-drop policy if exists "Earn quarterly results can be inserted" on public.earn_quarterly_results;
-create policy "Earn quarterly results can be inserted"
-  on public.earn_quarterly_results
+drop policy if exists "Earn period results can be inserted" on public.earn_period_results;
+create policy "Earn period results can be inserted"
+  on public.earn_period_results
   for insert
   to anon, authenticated
   with check (true);
 
-drop policy if exists "Earn quarterly results can be updated" on public.earn_quarterly_results;
-create policy "Earn quarterly results can be updated"
-  on public.earn_quarterly_results
+drop policy if exists "Earn period results can be updated" on public.earn_period_results;
+create policy "Earn period results can be updated"
+  on public.earn_period_results
   for update
   to anon, authenticated
   using (true)
   with check (true);
 
-grant insert, update on public.earn_quarterly_results to anon, authenticated;
+grant select, insert, update on public.earn_period_results to anon, authenticated;
 
-create index if not exists earn_quarterly_results_period_end_idx
-  on public.earn_quarterly_results (period_end desc);
+create index if not exists earn_period_results_company_period_idx
+  on public.earn_period_results (company_code, period_end desc);
 
 create table if not exists public.earn_annual_profit_flows (
   id text primary key,

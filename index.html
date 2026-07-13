@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta
       name="description"
-      content="複数企業の四半期決算を収集・可視化するダッシュボード"
+      content="複数企業のEDINET半期・通期決算を収集・可視化するダッシュボード"
     />
     <title>Earnings Atelier</title>
     <link rel="icon" type="image/png" href="./earn.png" />
@@ -31,8 +31,8 @@
 
         <section class="company-switcher" aria-label="表示企業">
           <p class="sidebar-label">NIKKEI 225 · MARKET CAP TOP 20</p>
-          <button class="company-button" data-company="kioxia" type="button"><span class="company-rank">01</span><span><strong>KIOXIA</strong><small>285A</small></span></button>
-          <button class="company-button active" data-company="toyota" type="button"><span class="company-rank">02</span><span><strong>TOYOTA</strong><small>7203</small></span></button>
+          <button class="company-button active" data-company="toyota" type="button"><span class="company-rank">01</span><span><strong>TOYOTA</strong><small>7203</small></span></button>
+          <button class="company-button" data-company="kioxia" type="button"><span class="company-rank">02</span><span><strong>KIOXIA</strong><small>285A</small></span></button>
           <button class="company-button" data-company="mufg" type="button"><span class="company-rank">03</span><span><strong>MUFG</strong><small>8306</small></span></button>
           <button class="company-button" data-company="softbank-group" type="button"><span class="company-rank">04</span><span><strong>SOFTBANK GROUP</strong><small>9984</small></span></button>
           <button class="company-button" data-company="tokyo-electron" type="button"><span class="company-rank">05</span><span><strong>TOKYO ELECTRON</strong><small>8035</small></span></button>
@@ -84,7 +84,7 @@
             <p class="eyebrow" id="company-name">TOYOTA MOTOR CORPORATION</p>
             <h2>Financial Overview</h2>
             <p class="hero-description">
-              公式IR資料から取得した四半期ごとの業績を、単独期間ベースで可視化します。
+              EDINETから取得した上期・通期の累計業績を、提出期間ベースで可視化します。
             </p>
           </div>
           <div class="period-picker">
@@ -95,9 +95,9 @@
               </div>
             </div>
             <div class="period-field quarter-field">
-              <label for="quarter-select">四半期</label>
+              <label for="quarter-select">提出期間</label>
               <div class="select-wrap">
-                <select id="quarter-select" aria-label="対象四半期"></select>
+                <select id="quarter-select" aria-label="対象提出期間"></select>
               </div>
             </div>
             <small id="period-caption">決算期間 —</small>
@@ -155,7 +155,7 @@
           <article class="panel performance-panel">
             <div class="panel-heading">
               <div>
-                <p class="eyebrow">QUARTERLY TREND</p>
+                <p class="eyebrow">HALF-YEAR / FULL-YEAR TREND</p>
                 <h3>Revenue &amp; Profit</h3>
               </div>
               <div class="legend">

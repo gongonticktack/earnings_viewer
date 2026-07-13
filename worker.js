@@ -36,24 +36,41 @@ const xbrlFactDefinitions = [
   { concept: "NetSales", label: "Net sales", order: 10 },
   { concept: "NetSalesSummaryOfBusinessResults", label: "Net sales", order: 10 },
   { concept: "Revenue", label: "Revenue", order: 11 },
+  { concept: "RevenueIFRS", label: "Revenue", order: 11 },
   { concept: "RevenueIFRSSummaryOfBusinessResults", label: "Revenue", order: 11 },
+  { concept: "SalesRevenuesIFRS", label: "Sales revenues", order: 11 },
+  { concept: "TotalNetRevenuesIFRS", label: "Total net revenues", order: 11 },
   { concept: "OperatingRevenue", label: "Operating revenue", order: 12 },
+  { concept: "OrdinaryIncome", label: "Ordinary income", order: 13 },
+  { concept: "OrdinaryIncomeSummaryOfBusinessResults", label: "Ordinary income", order: 13 },
   { concept: "OperatingIncome", label: "Operating income", order: 20 },
   { concept: "OperatingIncomeLossSummaryOfBusinessResults", label: "Operating income", order: 20 },
   { concept: "OperatingProfitLossIFRSSummaryOfBusinessResults", label: "Operating profit", order: 20 },
+  { concept: "OperatingProfitLossIFRS", label: "Operating profit", order: 20 },
   { concept: "ProfitLossBeforeTax", label: "Profit before tax", order: 30 },
   { concept: "ProfitLossBeforeTaxIFRSSummaryOfBusinessResults", label: "Profit before tax", order: 30 },
+  { concept: "ProfitLossBeforeTaxIFRS", label: "Profit before tax", order: 30 },
+  { concept: "OrdinaryProfitLoss", label: "Ordinary profit", order: 31 },
+  { concept: "OrdinaryProfitLossSummaryOfBusinessResults", label: "Ordinary profit", order: 31 },
   { concept: "ProfitLoss", label: "Profit or loss", order: 40 },
   { concept: "ProfitLossSummaryOfBusinessResults", label: "Profit or loss", order: 40 },
   { concept: "ProfitLossAttributableToOwnersOfParent", label: "Profit attributable to owners of parent", order: 41 },
   { concept: "ProfitLossAttributableToOwnersOfParentIFRSSummaryOfBusinessResults", label: "Profit attributable to owners of parent", order: 41 },
+  { concept: "ProfitLossAttributableToOwnersOfParentIFRS", label: "Profit attributable to owners of parent", order: 41 },
   { concept: "NetIncomeLoss", label: "Net income", order: 42 },
   { concept: "NetIncomeLossSummaryOfBusinessResults", label: "Net income", order: 42 },
   { concept: "CashAndCashEquivalents", label: "Cash and cash equivalents", order: 50 },
   { concept: "CashAndCashEquivalentsIFRS", label: "Cash and cash equivalents", order: 50 },
+  { concept: "CashAndCashEquivalentsIFRSSummaryOfBusinessResults", label: "Cash and cash equivalents", order: 50 },
   { concept: "NetCashProvidedByUsedInOperatingActivities", label: "Operating cash flow", order: 60 },
+  { concept: "NetCashProvidedByUsedInOperatingActivitiesIFRS", label: "Operating cash flow", order: 60 },
+  { concept: "CashFlowsFromUsedInOperatingActivitiesIFRSSummaryOfBusinessResults", label: "Operating cash flow", order: 60 },
   { concept: "NetCashProvidedByUsedInInvestingActivities", label: "Investing cash flow", order: 61 },
+  { concept: "NetCashProvidedByUsedInInvestingActivitiesIFRS", label: "Investing cash flow", order: 61 },
+  { concept: "CashFlowsFromUsedInInvestingActivitiesIFRSSummaryOfBusinessResults", label: "Investing cash flow", order: 61 },
   { concept: "NetCashProvidedByUsedInFinancingActivities", label: "Financing cash flow", order: 62 },
+  { concept: "NetCashProvidedByUsedInFinancingActivitiesIFRS", label: "Financing cash flow", order: 62 },
+  { concept: "CashFlowsFromUsedInFinancingActivitiesIFRSSummaryOfBusinessResults", label: "Financing cash flow", order: 62 },
   { concept: "Assets", label: "Assets", order: 70 },
   { concept: "AssetsSummaryOfBusinessResults", label: "Assets", order: 70 },
   { concept: "Liabilities", label: "Liabilities", order: 71 },
@@ -61,21 +78,45 @@ const xbrlFactDefinitions = [
 ];
 const xbrlFactDefinitionByConcept = new Map(xbrlFactDefinitions.map((definition) => [definition.concept, definition]));
 const revenueConcepts = [
-  "RevenueIFRSSummaryOfBusinessResults", "Revenue", "NetSalesSummaryOfBusinessResults", "NetSales", "OperatingRevenue",
+  "RevenueIFRSSummaryOfBusinessResults", "RevenueIFRS", "SalesRevenuesIFRS", "TotalNetRevenuesIFRS", "Revenue",
+  "NetSalesSummaryOfBusinessResults", "NetSales", "OperatingRevenue",
+  "OrdinaryIncomeSummaryOfBusinessResults", "OrdinaryIncome",
 ];
 const operatingIncomeConcepts = [
-  "OperatingProfitLossIFRSSummaryOfBusinessResults", "OperatingIncomeLossSummaryOfBusinessResults", "OperatingIncome",
+  "OperatingProfitLossIFRSSummaryOfBusinessResults", "OperatingProfitLossIFRS",
+  "OperatingIncomeLossSummaryOfBusinessResults", "OperatingIncome",
 ];
-const pretaxIncomeConcepts = ["ProfitLossBeforeTaxIFRSSummaryOfBusinessResults", "ProfitLossBeforeTax"];
+const pretaxIncomeConcepts = [
+  "ProfitLossBeforeTaxIFRSSummaryOfBusinessResults", "ProfitLossBeforeTaxIFRS", "ProfitLossBeforeTax",
+  "OrdinaryProfitLossSummaryOfBusinessResults", "OrdinaryProfitLoss",
+];
 const netIncomeConcepts = [
   "ProfitLossAttributableToOwnersOfParentIFRSSummaryOfBusinessResults",
+  "ProfitLossAttributableToOwnersOfParentIFRS",
   "ProfitLossAttributableToOwnersOfParent",
   "NetIncomeLossSummaryOfBusinessResults",
   "NetIncomeLoss",
   "ProfitLossSummaryOfBusinessResults",
   "ProfitLoss",
 ];
-const cashConcepts = ["CashAndCashEquivalentsIFRS", "CashAndCashEquivalents"];
+const cashConcepts = [
+  "CashAndCashEquivalentsIFRSSummaryOfBusinessResults", "CashAndCashEquivalentsIFRS", "CashAndCashEquivalents",
+];
+const operatingCashFlowConcepts = [
+  "CashFlowsFromUsedInOperatingActivitiesIFRSSummaryOfBusinessResults",
+  "NetCashProvidedByUsedInOperatingActivitiesIFRS",
+  "NetCashProvidedByUsedInOperatingActivities",
+];
+const investingCashFlowConcepts = [
+  "CashFlowsFromUsedInInvestingActivitiesIFRSSummaryOfBusinessResults",
+  "NetCashProvidedByUsedInInvestingActivitiesIFRS",
+  "NetCashProvidedByUsedInInvestingActivities",
+];
+const financingCashFlowConcepts = [
+  "CashFlowsFromUsedInFinancingActivitiesIFRSSummaryOfBusinessResults",
+  "NetCashProvidedByUsedInFinancingActivitiesIFRS",
+  "NetCashProvidedByUsedInFinancingActivities",
+];
 const supabaseUrl = config.supabase?.url;
 const supabaseKey = config.supabase?.key;
 
@@ -249,7 +290,10 @@ function edinetUrl(path, apiKey, params = {}) {
 async function fetchEdinetDocumentList(_env, date) {
   const apiKey = requireEdinetApiKey();
   const response = await fetch(edinetUrl("/documents.json", apiKey, { date, type: "2" }), {
-    headers: { "User-Agent": "earnings-viewer/1.0" },
+    headers: {
+      "Subscription-Key": apiKey,
+      "User-Agent": "earnings-viewer/1.0",
+    },
   });
   const text = await response.text();
   if (!response.ok) {
@@ -309,7 +353,10 @@ function filterEdinetDocuments(documents, requestedCompanyCode = null) {
 async function fetchEdinetXbrlArchive(_env, documentId) {
   const apiKey = requireEdinetApiKey();
   const response = await fetch(edinetUrl(`/documents/${documentId}`, apiKey, { type: "1" }), {
-    headers: { "User-Agent": "earnings-viewer/1.0" },
+    headers: {
+      "Subscription-Key": apiKey,
+      "User-Agent": "earnings-viewer/1.0",
+    },
   });
   const contentType = response.headers.get("Content-Type") ?? "";
   if (!response.ok) {
@@ -521,15 +568,6 @@ function durationDays(start, end) {
   return Math.round((Date.parse(`${end}T00:00:00Z`) - Date.parse(`${start}T00:00:00Z`)) / 86400000);
 }
 
-function quarterForDocument(document) {
-  const days = durationDays(document.period_start, document.period_end);
-  if (days === null || days < 45 || days > 380) return null;
-  if (days <= 110) return 1;
-  if (days <= 200) return 2;
-  if (days <= 290) return 3;
-  return 4;
-}
-
 function contextScore(contextRef = "") {
   const value = contextRef.toLowerCase();
   let score = 0;
@@ -554,27 +592,52 @@ function metricValue(facts, concepts, periodStart, periodEnd, instant = false) {
   return null;
 }
 
-function latestDocumentsByPeriod(documents) {
+function effectivePeriod(document, facts) {
+  const docType = String(document.doc_type_code);
+  if (docType === "120") {
+    return document.period_start && document.period_end
+      ? { periodType: "FY", periodStart: document.period_start, periodEnd: document.period_end }
+      : null;
+  }
+  if (docType !== "160") return null;
+
+  const candidates = new Map();
+  for (const fact of facts) {
+    const days = durationDays(fact.period_start, fact.period_end);
+    if (days === null || days < 120 || days > 220) continue;
+    if (document.period_start && fact.period_start !== document.period_start) continue;
+    const key = `${fact.period_start}:${fact.period_end}`;
+    candidates.set(key, (candidates.get(key) ?? 0) + (1000 - Number(fact.display_order ?? 999)));
+  }
+  const selected = [...candidates.entries()].sort((a, b) => b[1] - a[1])[0]?.[0];
+  if (!selected) return null;
+  const [periodStart, periodEnd] = selected.split(":");
+  return { periodType: "H1", periodStart, periodEnd };
+}
+
+function latestDocumentsByPeriod(documents, factsByDocument) {
   const fiscalEndMonths = new Map();
   for (const document of documents) {
-    if (quarterForDocument(document) === 4) {
+    if (String(document.doc_type_code) === "120" && document.period_end) {
       fiscalEndMonths.set(document.company_code, Number(document.period_end.slice(5, 7)));
     }
   }
   const latest = new Map();
   for (const document of documents) {
-    const quarter = quarterForDocument(document);
-    if (!quarter) continue;
-    const startYear = Number(document.period_start.slice(0, 4));
-    const startMonth = Number(document.period_start.slice(5, 7));
+    const documentFacts = factsByDocument.get(document.id) ?? [];
+    const period = effectivePeriod(document, documentFacts);
+    if (!period) continue;
+    const startYear = Number(period.periodStart.slice(0, 4));
+    const startMonth = Number(period.periodStart.slice(5, 7));
     const fiscalEndMonth = fiscalEndMonths.get(document.company_code) ?? 3;
-    const fiscalYear = quarter === 4
+    const declaredDays = durationDays(document.period_start, document.period_end);
+    const fiscalYear = period.periodType === "FY" || (period.periodType === "H1" && declaredDays > 290)
       ? Number(document.period_end.slice(0, 4))
       : startYear + (fiscalEndMonth < startMonth ? 1 : 0);
-    const key = `${document.company_code}:${fiscalYear}:${quarter}`;
+    const key = `${document.company_code}:${fiscalYear}:${period.periodType}`;
     const existing = latest.get(key);
     if (!existing || `${document.submitted_at}:${document.id}` > `${existing.submitted_at}:${existing.id}`) {
-      latest.set(key, { ...document, fiscalYear, quarter });
+      latest.set(key, { ...document, ...period, fiscalYear });
     }
   }
   return [...latest.values()];
@@ -587,61 +650,47 @@ function buildDashboardRows(documents, facts) {
     factsByDocument.get(fact.document_id).push(fact);
   }
 
-  const cumulative = latestDocumentsByPeriod(documents).map((document) => {
+  const cumulative = latestDocumentsByPeriod(documents, factsByDocument).map((document) => {
     const documentFacts = factsByDocument.get(document.id) ?? [];
     return {
       ...document,
-      revenue: metricValue(documentFacts, revenueConcepts, document.period_start, document.period_end),
-      operatingIncome: metricValue(documentFacts, operatingIncomeConcepts, document.period_start, document.period_end),
-      pretaxIncome: metricValue(documentFacts, pretaxIncomeConcepts, document.period_start, document.period_end),
-      netIncome: metricValue(documentFacts, netIncomeConcepts, document.period_start, document.period_end),
-      operatingCashFlow: metricValue(documentFacts, ["NetCashProvidedByUsedInOperatingActivities"], document.period_start, document.period_end),
-      investingCashFlow: metricValue(documentFacts, ["NetCashProvidedByUsedInInvestingActivities"], document.period_start, document.period_end),
-      financingCashFlow: metricValue(documentFacts, ["NetCashProvidedByUsedInFinancingActivities"], document.period_start, document.period_end),
-      cash: metricValue(documentFacts, cashConcepts, document.period_start, document.period_end, true),
+      revenue: metricValue(documentFacts, revenueConcepts, document.periodStart, document.periodEnd),
+      operatingIncome: metricValue(documentFacts, operatingIncomeConcepts, document.periodStart, document.periodEnd),
+      pretaxIncome: metricValue(documentFacts, pretaxIncomeConcepts, document.periodStart, document.periodEnd),
+      netIncome: metricValue(documentFacts, netIncomeConcepts, document.periodStart, document.periodEnd),
+      operatingCashFlow: metricValue(documentFacts, operatingCashFlowConcepts, document.periodStart, document.periodEnd),
+      investingCashFlow: metricValue(documentFacts, investingCashFlowConcepts, document.periodStart, document.periodEnd),
+      financingCashFlow: metricValue(documentFacts, financingCashFlowConcepts, document.periodStart, document.periodEnd),
+      cash: metricValue(documentFacts, cashConcepts, document.periodStart, document.periodEnd, true),
     };
   }).sort((a, b) => (
     a.company_code.localeCompare(b.company_code)
     || a.fiscalYear - b.fiscalYear
-    || a.quarter - b.quarter
+    || a.periodEnd.localeCompare(b.periodEnd)
   ));
 
-  const cumulativeByPeriod = new Map(cumulative.map((row) => [
-    `${row.company_code}:${row.fiscalYear}:${row.quarter}`,
-    row,
-  ]));
-  const quarterlyResults = [];
+  const periodResults = [];
   for (const row of cumulative) {
-    const previous = row.quarter === 1
-      ? null
-      : cumulativeByPeriod.get(`${row.company_code}:${row.fiscalYear}:${row.quarter - 1}`);
-    if (row.quarter > 1 && !previous) continue;
-    const standalone = (value, previousValue) => {
-      if (value === null || (row.quarter > 1 && previousValue === null)) return null;
-      return row.quarter === 1 ? value : value - previousValue;
-    };
-    const revenue = standalone(row.revenue, previous?.revenue);
-    const operatingIncome = standalone(row.operatingIncome, previous?.operatingIncome);
-    const pretaxIncome = standalone(row.pretaxIncome, previous?.pretaxIncome);
-    const netIncome = standalone(row.netIncome, previous?.netIncome);
-    if (revenue === null || netIncome === null) continue;
-    quarterlyResults.push({
+    if (row.revenue === null || row.netIncome === null
+      || (row.operatingIncome === null && row.pretaxIncome === null)) continue;
+    periodResults.push({
       id: `edinet-${row.id}`,
       company_code: row.company_code,
       fiscal_year: row.fiscalYear,
-      quarter: row.quarter,
-      period_end: row.period_end,
-      revenue: Math.round(revenue),
-      operating_cost: operatingIncome === null ? null : Math.round(revenue - operatingIncome),
-      operating_income: operatingIncome === null ? null : Math.round(operatingIncome),
-      pretax_income: pretaxIncome === null ? null : Math.round(pretaxIncome),
-      net_income: Math.round(netIncome),
+      period_type: row.periodType,
+      period_start: row.periodStart,
+      period_end: row.periodEnd,
+      revenue: Math.round(row.revenue),
+      operating_cost: row.operatingIncome === null ? null : Math.round(row.revenue - row.operatingIncome),
+      operating_income: row.operatingIncome === null ? null : Math.round(row.operatingIncome),
+      pretax_income: row.pretaxIncome === null ? null : Math.round(row.pretaxIncome),
+      net_income: Math.round(row.netIncome),
       source_url: "https://disclosure2.edinet-fsa.go.jp/",
       synced_at: new Date().toISOString(),
     });
   }
 
-  const annualRows = cumulative.filter((row) => row.quarter === 4);
+  const annualRows = cumulative.filter((row) => row.periodType === "FY");
   const annualByCompanyYear = new Map(annualRows.map((row) => [`${row.company_code}:${row.fiscalYear}`, row]));
   const annualFlows = [];
   for (const current of annualRows) {
@@ -670,12 +719,12 @@ function buildDashboardRows(documents, facts) {
       synced_at: new Date().toISOString(),
     });
   }
-  return { quarterlyResults, annualFlows };
+  return { periodResults, annualFlows };
 }
 
 async function promoteEdinetFacts(env, companyCodes) {
   if (!companyCodes.length || !hasSupabaseConfig()) {
-    return { quarterlyResults: 0, annualFlows: 0 };
+    return { periodResults: 0, annualFlows: 0 };
   }
   const companyFilter = `(${companyCodes.join(",")})`;
   const [documents, facts] = await Promise.all([
@@ -683,7 +732,7 @@ async function promoteEdinetFacts(env, companyCodes) {
     fetchAllSupabaseRows(env, "earn_edinet_facts", `company_code=in.${encodeURIComponent(companyFilter)}&select=*`),
   ]);
   const rows = buildDashboardRows(documents, facts);
-  await upsertSupabaseRows(env, "earn_quarterly_results", "company_code,fiscal_year,quarter", rows.quarterlyResults);
+  await upsertSupabaseRows(env, "earn_period_results", "company_code,fiscal_year,period_type", rows.periodResults);
   await upsertSupabaseRows(env, "earn_annual_profit_flows", "company_code,current_fiscal_year", rows.annualFlows);
 
   const response = await fetch(
@@ -698,7 +747,7 @@ async function promoteEdinetFacts(env, companyCodes) {
     const detail = await response.text();
     throw new Error(`Supabase company sync timestamp update failed (${response.status}): ${detail.slice(0, 500)}`);
   }
-  return { quarterlyResults: rows.quarterlyResults.length, annualFlows: rows.annualFlows.length };
+  return { periodResults: rows.periodResults.length, annualFlows: rows.annualFlows.length };
 }
 
 async function syncEdinetDocuments(request, env) {
@@ -743,7 +792,7 @@ async function syncEdinetDocuments(request, env) {
 
   let persisted = false;
   let factsPersisted = false;
-  let promoted = { quarterlyResults: 0, annualFlows: 0 };
+  let promoted = { periodResults: 0, annualFlows: 0 };
   let persistenceError = null;
   try {
     persisted = await saveEdinetDocuments(env, documents);

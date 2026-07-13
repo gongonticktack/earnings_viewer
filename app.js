@@ -7,8 +7,9 @@ const defaultAppConfig = {
     edinetSync: "/api/edinet/sync",
   },
   edinet: {
-    historyDays: 400,
-    batchDays: 31,
+    historyDays: 45,
+    batchDays: 15,
+    bootstrapDates: {},
   },
 };
 
@@ -335,6 +336,47 @@ const fallbackResults = {
   mitsui: [],
 };
 
+function cumulativeFallbackPeriods(resultsByCompany) {
+  const sumMetric = (rows, key) => rows.every((row) => row[key] !== null && row[key] !== undefined)
+    ? rows.reduce((total, row) => total + row[key], 0)
+    : null;
+  return Object.fromEntries(Object.entries(resultsByCompany).map(([companyCode, rows]) => {
+    const byYear = new Map();
+    for (const row of rows) {
+      if (!byYear.has(row.fiscalYear)) byYear.set(row.fiscalYear, []);
+      byYear.get(row.fiscalYear).push(row);
+    }
+    const periods = [];
+    for (const [fiscalYear, yearRows] of byYear) {
+      const ordered = [...yearRows].sort((a, b) => a.quarter - b.quarter);
+      for (const definition of [
+        { periodType: "H1", required: 2, rows: ordered.filter((row) => row.quarter <= 2) },
+        { periodType: "FY", required: 4, rows: ordered },
+      ]) {
+        if (definition.rows.length !== definition.required) continue;
+        const last = definition.rows.at(-1);
+        periods.push({
+          id: `${companyCode}-fy${fiscalYear}-${definition.periodType.toLowerCase()}`,
+          companyCode,
+          fiscalYear,
+          periodType: definition.periodType,
+          periodStart: null,
+          periodEnd: last.periodEnd,
+          revenue: sumMetric(definition.rows, "revenue"),
+          operatingCost: sumMetric(definition.rows, "operatingCost"),
+          operatingIncome: sumMetric(definition.rows, "operatingIncome"),
+          pretaxIncome: sumMetric(definition.rows, "pretaxIncome"),
+          netIncome: sumMetric(definition.rows, "netIncome"),
+          sourceUrl: last.sourceUrl,
+        });
+      }
+    }
+    return [companyCode, periods];
+  }));
+}
+
+const fallbackPeriodResults = cumulativeFallbackPeriods(fallbackResults);
+
 const registeredDataDescription = "公式IR資料をもとにJSへ登録済みのデータ（リアルタイム自動取得ではありません）";
 
 const annualAnalyses = {
@@ -401,12 +443,12 @@ const annualAnalyses = {
 
 const state = {
   companyCode: "toyota",
-  resultsByCompany: { ...fallbackResults },
+  resultsByCompany: { ...fallbackPeriodResults },
   edinetDocumentsByCompany: {},
   edinetFactsByCompany: {},
   officialIrDocumentsByCompany: {},
-  results: fallbackResults.toyota,
-  activeId: fallbackResults.toyota.at(-1).id,
+  results: fallbackPeriodResults.toyota,
+  activeId: fallbackPeriodResults.toyota.at(-1).id,
   lastSyncedAtByCompany: {},
   syncLogs: [],
   stockChartSymbol: companies.toyota.stockSymbol,
@@ -494,12 +536,12 @@ function formatDate(dateString) {
   }).format(new Date(`${dateString}T00:00:00`));
 }
 
-function quarterLabel(result) {
-  return `${result.fiscalYear}年${result.quarter}Q`;
+function periodTypeLabel(result) {
+  return result.periodType === "H1" ? "上期累計" : "通期累計";
 }
 
-function chartQuarterLabel(result) {
-  return `${String(result.fiscalYear)}年${result.quarter}Q`;
+function chartPeriodLabel(result) {
+  return `FY${String(result.fiscalYear)} ${result.periodType}`;
 }
 
 function activeResult() {
@@ -518,17 +560,18 @@ function activeAnnualAnalysis() {
   return analysis && (!year || analysisYear === year) ? analysis : null;
 }
 
-function previousResult(result) {
+function comparisonResult(result) {
   if (!result) return null;
-  const currentIndex = state.results.findIndex((item) => item.id === result.id);
-  return currentIndex > 0 ? state.results[currentIndex - 1] : null;
+  return state.results.find((item) => (
+    item.fiscalYear === result.fiscalYear - 1 && item.periodType === result.periodType
+  )) ?? null;
 }
 
 function renderPicker() {
   const years = [...new Set(state.results.map((result) => result.fiscalYear))].sort((a, b) => b - a);
   const current = activeResult();
   const selectedYear = current?.fiscalYear ?? years[0];
-  const quarters = state.results.filter((result) => result.fiscalYear === selectedYear);
+  const periods = state.results.filter((result) => result.fiscalYear === selectedYear);
 
   elements.yearSelect.innerHTML = years
     .map((year) => `<option value="${year}">${year}年度</option>`)
@@ -536,23 +579,28 @@ function renderPicker() {
   elements.yearSelect.value = selectedYear ?? "";
   elements.yearSelect.disabled = !years.length;
 
-  elements.quarterSelect.innerHTML = quarters
+  elements.quarterSelect.innerHTML = periods
     .map(
       (result) =>
-        `<option value="${result.id}">${result.quarter}Q — ${formatDate(result.periodEnd)}</option>`,
+        `<option value="${result.id}">${periodTypeLabel(result)} — ${formatDate(result.periodEnd)}</option>`,
     )
     .join("");
   elements.quarterSelect.value = state.activeId;
-  elements.quarterSelect.disabled = !quarters.length;
+  elements.quarterSelect.disabled = !periods.length;
 }
 
 function profitValue(result) {
-  return state.companyCode === "softbank-group" ? result.pretaxIncome : result.operatingIncome;
+  return usesPretaxMetric(result) ? result.pretaxIncome : result.operatingIncome;
+}
+
+function usesPretaxMetric(result) {
+  return state.companyCode === "softbank-group"
+    || (result?.operatingIncome === null && result?.pretaxIncome !== null);
 }
 
 function renderMetrics() {
   const current = activeResult();
-  const usesPretaxIncome = state.companyCode === "softbank-group";
+  const usesPretaxIncome = usesPretaxMetric(current);
   elements.metricCostCaption.textContent = usesPretaxIncome ? "連結サマリーでは非開示" : "営業収益 − 営業利益";
   elements.metricProfitTitle.textContent = usesPretaxIncome ? "Profit Before Tax" : "Operating Income";
   elements.metricProfitCaption.textContent = usesPretaxIncome ? "税引前利益" : "営業利益";
@@ -569,7 +617,7 @@ function renderMetrics() {
     elements.marginChange.style.color = "var(--muted)";
     return;
   }
-  const previous = previousResult(current);
+  const previous = comparisonResult(current);
   elements.periodCaption.textContent = `発行年月日 ${formatDate(current.periodEnd)}`;
 
   metricIds.forEach((metric) => {
@@ -585,7 +633,7 @@ function renderMetrics() {
     }
 
     const change = ((current[key] - previous[key]) / previous[key]) * 100;
-    changeElement.textContent = `${formatPercent(change)} QoQ`;
+    changeElement.textContent = `${formatPercent(change)} YoY`;
     changeElement.classList.toggle("negative", change < 0);
   });
 
@@ -594,7 +642,7 @@ function renderMetrics() {
   const previousMargin = previous ? (previous[profitKey] / previous.revenue) * 100 : margin;
   const pointChange = margin - previousMargin;
   elements.marginValue.textContent = `${margin.toFixed(1)}%`;
-  elements.marginChange.textContent = `${pointChange >= 0 ? "+" : ""}${pointChange.toFixed(1)} pt QoQ`;
+  elements.marginChange.textContent = `${pointChange >= 0 ? "+" : ""}${pointChange.toFixed(1)} pt YoY`;
   elements.marginChange.style.color = pointChange >= 0 ? "var(--green)" : "var(--red)";
 }
 
@@ -777,7 +825,7 @@ function drawPerformanceChart() {
     ctx.textAlign = "center";
     ctx.font = `${index === activeIndex ? "800" : "600"} 9px "Manrope"`;
     if (visibleLabelIndexes.has(index)) {
-      const label = chartQuarterLabel(result);
+      const label = chartPeriodLabel(result);
       ctx.fillText(label, clampedTextX(ctx, label, x, padding.left, width - padding.right), height - 7);
     }
 
@@ -880,7 +928,7 @@ function drawMarginChart() {
     ctx.textAlign = "center";
     ctx.font = `${index === activeIndex ? "800" : "600"} 9px "Manrope"`;
     if (visibleLabelIndexes.has(index)) {
-      const label = chartQuarterLabel(results[index]);
+      const label = chartPeriodLabel(results[index]);
       ctx.fillText(label, clampedTextX(ctx, label, point.x, padding.left, width - padding.right), height - 7);
     }
   });
@@ -1185,7 +1233,7 @@ function showToast(message) {
 
 function updateSyncButtonAvailability({ loading = false } = {}) {
   elements.syncButton.disabled = loading;
-  elements.syncButton.title = "公式IR PDF一覧を更新し、本日提出されたEDINET書類をDBへ保存します。";
+  elements.syncButton.title = "公式IR PDF一覧とEDINETの上期・通期データを更新します。";
   elements.syncButtonLabel.textContent = "更新";
 }
 
@@ -1307,9 +1355,9 @@ async function loadCachedCompanyData(companyCode, config) {
       { companyCode, stage: "企業マスタ読込", description: "前回同期日時" },
     ),
     fetchJsonWithSyncLog(
-      `${baseUrl}/earn_quarterly_results?company_code=eq.${companyCode}&select=*&order=period_end.asc`,
+      `${baseUrl}/earn_period_results?company_code=eq.${companyCode}&select=*&order=period_end.asc`,
       { headers },
-      { companyCode, stage: "四半期データ読込", description: "保存済み四半期データ" },
+      { companyCode, stage: "期間データ読込", description: "保存済み上期・通期データ" },
     ),
     fetchJsonWithSyncLog(
       `${baseUrl}/earn_annual_profit_flows?company_code=eq.${companyCode}&select=*&order=synced_at.desc&limit=1`,
@@ -1339,13 +1387,16 @@ async function loadCachedCompanyData(companyCode, config) {
   addSyncLog(
     "success",
     "DB読込完了",
-    `${resultsData.length}件の四半期データを読み込みました。`,
+    `${resultsData.length}件の上期・通期データを読み込みました。`,
     companyCode,
   );
   if (resultsData.length) {
     addSyncLog("success", "データ種別", `DB保存済み: ${registeredDataDescription}`, companyCode);
   }
-  return state.lastSyncedAtByCompany[companyCode];
+  return {
+    lastSyncedAt: state.lastSyncedAtByCompany[companyCode],
+    periodCount: resultsData.length,
+  };
 }
 
 async function loadOfficialIrDocuments(companyCode) {
@@ -1366,11 +1417,11 @@ async function syncTodayEdinetDocuments(companyCode, config) {
   const configuredHistoryDays = Number(config.edinet?.historyDays);
   const configuredBatchDays = Number(config.edinet?.batchDays);
   const historyDays = Number.isInteger(configuredHistoryDays) && configuredHistoryDays > 0
-    ? Math.min(configuredHistoryDays, 400)
-    : 400;
+    ? Math.min(configuredHistoryDays, 60)
+    : 45;
   const batchDays = Number.isInteger(configuredBatchDays) && configuredBatchDays > 0
     ? Math.min(configuredBatchDays, 31)
-    : 31;
+    : 15;
   const batches = Math.ceil(historyDays / batchDays);
   let saved = 0;
   let promoted = 0;
@@ -1412,10 +1463,10 @@ async function syncTodayEdinetDocuments(companyCode, config) {
       if (payload.persistenceError) {
         addSyncLog("error", "Worker保存 失敗", payload.persistenceError, companyCode);
       }
-      promoted += payload.promoted?.quarterlyResults ?? 0;
+      promoted += payload.promoted?.periodResults ?? 0;
       saved += payload.facts?.length ?? payload.documents?.length ?? 0;
     }
-    addSyncLog("success", "EDINET同期 完了", `${saved}件のXBRLデータを保存し、${promoted}件の四半期データを更新しました。`, companyCode);
+    addSyncLog("success", "EDINET同期 完了", `${saved}件のXBRLデータを保存し、${promoted}件の上期・通期データを更新しました。`, companyCode);
     await loadCachedCompanyData(companyCode, config);
     return { saved, promoted };
   } catch (error) {
@@ -1424,7 +1475,38 @@ async function syncTodayEdinetDocuments(companyCode, config) {
   }
 }
 
-async function refreshCompany({ force = false, notify = false } = {}) {
+async function bootstrapEdinetDocuments(companyCode) {
+  const dates = appConfig.edinet?.bootstrapDates?.[companyCode] ?? [];
+  if (!dates.length) return { attempted: false, saved: 0, promoted: 0 };
+  let saved = 0;
+  let promoted = 0;
+  addSyncLog("info", "EDINET初期化 開始", `${dates.length}件の既知提出日から上期・通期データを取得します。`, companyCode);
+  for (const date of dates) {
+    const payload = await fetchJson(
+      `${appConfig.api.edinetSync}?date=${date}&days=1&company=${encodeURIComponent(companyCode)}`,
+      { method: "POST", timeoutMs: 120000 },
+    );
+    if (payload.edinetError) throw new Error(payload.edinetError);
+    if (payload.persistenceError) throw new Error(payload.persistenceError);
+    saved += payload.factsSaved ?? payload.facts?.length ?? 0;
+    promoted += payload.promoted?.periodResults ?? 0;
+  }
+  addSyncLog("success", "EDINET初期化 完了", `${saved}件のXBRL数値から${promoted}件の期間データを更新しました。`, companyCode);
+  return { attempted: true, saved, promoted };
+}
+
+function syncedToday(value) {
+  if (!value) return false;
+  const dateInJapan = (date) => new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Tokyo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(date);
+  return dateInJapan(new Date(value)) === dateInJapan(new Date());
+}
+
+async function refreshCompany({ force = false, notify = false, bypassFreshness = false } = {}) {
   const config = appConfig;
   const companyCode = state.companyCode;
   elements.syncButton.classList.add("loading");
@@ -1438,11 +1520,16 @@ async function refreshCompany({ force = false, notify = false } = {}) {
       return;
     }
 
-    await Promise.all([
+    const [cached] = await Promise.all([
       loadCachedCompanyData(companyCode, config),
       loadOfficialIrDocuments(companyCode),
     ]);
-    const payload = force ? await syncTodayEdinetDocuments(companyCode, config) : null;
+    const bootstrap = force && cached.periodCount === 0
+      ? await bootstrapEdinetDocuments(companyCode)
+      : { attempted: false };
+    const needsEdinetSync = force
+      && (bootstrap.attempted || bypassFreshness || !syncedToday(state.lastSyncedAtByCompany[companyCode]));
+    const payload = needsEdinetSync ? await syncTodayEdinetDocuments(companyCode, config) : null;
 
     if (state.companyCode === companyCode) {
       state.results = state.resultsByCompany[companyCode];
@@ -1455,7 +1542,7 @@ async function refreshCompany({ force = false, notify = false } = {}) {
         payload?.edinetSyncFailed
           ? "公式IR PDF一覧を更新しました。EDINET同期の詳細はSync Logを確認してください。"
           : payload
-          ? `${payload.saved}件のXBRL数値を保存し、${payload.promoted}件の四半期データを更新しました。`
+          ? `${payload.saved}件のXBRL数値を保存し、${payload.promoted}件の上期・通期データを更新しました。`
           : "保存済みの最新データを表示しています。",
       );
     }
@@ -1473,7 +1560,8 @@ function normalizeResult(item) {
     id: item.id,
     companyCode: item.company_code ?? item.companyCode,
     fiscalYear: item.fiscal_year ?? item.fiscalYear,
-    quarter: item.quarter,
+    periodType: item.period_type ?? item.periodType,
+    periodStart: item.period_start ?? item.periodStart,
     periodEnd: item.period_end ?? item.periodEnd,
     revenue: item.revenue,
     operatingCost: item.operating_cost ?? item.operatingCost ?? null,
@@ -1538,8 +1626,8 @@ function normalizeAnnualFlow(item) {
 
 elements.yearSelect.addEventListener("change", (event) => {
   const selectedYear = Number(event.target.value);
-  const latestQuarter = state.results.filter((result) => result.fiscalYear === selectedYear).at(-1);
-  state.activeId = latestQuarter?.id ?? null;
+  const latestPeriod = state.results.filter((result) => result.fiscalYear === selectedYear).at(-1);
+  state.activeId = latestPeriod?.id ?? null;
   renderPicker();
   renderMetrics();
   renderDocuments();
@@ -1560,10 +1648,14 @@ elements.companyButtons.forEach((button) => {
     state.activeId = state.results.at(-1)?.id ?? null;
     updateLatestUpdate();
     render();
-    await refreshCompany();
+    await refreshCompany({ force: true });
   });
 });
-elements.syncButton.addEventListener("click", () => refreshCompany({ force: true, notify: true }));
+elements.syncButton.addEventListener("click", () => refreshCompany({
+  force: true,
+  notify: true,
+  bypassFreshness: true,
+}));
 elements.logClearButton.addEventListener("click", () => {
   state.syncLogs = [];
   renderSyncLogs();
