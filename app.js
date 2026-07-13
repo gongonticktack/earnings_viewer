@@ -1,16 +1,4 @@
 const defaultAppConfig = {
-  supabaseUrl: "",
-  supabaseAnonKey: "",
-  api: {
-    stocks: "/api/stocks",
-    officialIr: "/api/ir",
-    edinetSync: "/api/edinet/sync",
-  },
-  edinet: {
-    historyDays: 45,
-    batchDays: 15,
-    bootstrapDates: {},
-  },
 };
 
 /**
@@ -24,10 +12,8 @@ async function loadAppConfig() {
     if (!response.ok) throw new Error(`config.json could not be loaded (${response.status})`);
     const data = await response.json();
     return {
-      supabaseUrl: data.supabase?.url ?? defaultAppConfig.supabaseUrl,
-      supabaseAnonKey: data.supabase?.key ?? defaultAppConfig.supabaseAnonKey,
-      api: { ...defaultAppConfig.api, ...data.api },
-      edinet: { ...defaultAppConfig.edinet, ...data.edinet },
+      ...defaultAppConfig,
+      ...data,
     };
   } catch (error) {
     console.warn("config.jsonの読み込みに失敗したため、既定値を使用します。", error);
@@ -344,7 +330,7 @@ const fallbackResults = {
 };
 
 /**
- * 概要: 予備データの四半期情報を、EDINETに合わせた「上期」と「通期」の形へまとめます。
+ * 概要: 予備データの四半期情報を、画面で使う「上期」と「通期」の形へまとめます。
  * 引数: resultsByCompany - 会社ごとの四半期予備データ。
  * 戻り値: 会社ごとの上期・通期データ。
  */
@@ -389,9 +375,7 @@ function cumulativeFallbackPeriods(resultsByCompany) {
 
 const fallbackPeriodResults = cumulativeFallbackPeriods(fallbackResults);
 
-const registeredDataDescription = "公式IR資料をもとにJSへ登録済みのデータ（リアルタイム自動取得ではありません）";
-
-// 年間のキャッシュフロー表示に使うデータです。DBに値があれば、このあと上書きされます。
+// 年間のキャッシュフロー表示に使う登録済みデータです。
 const annualAnalyses = {
   toyota: {
     previousFiscalYear: "FY2025",
@@ -454,17 +438,14 @@ const annualAnalyses = {
   },
 };
 
-// 画面の今の状態を1か所に集めています。会社を変えたり、DBから読んだりするとここが変わります。
+// 画面の今の状態を1か所に集めています。会社を変えたり、PDF一覧を読んだりするとここが変わります。
 const state = {
   companyCode: "toyota",
   resultsByCompany: { ...fallbackPeriodResults },
-  edinetDocumentsByCompany: {},
-  edinetFactsByCompany: {},
   officialIrDocumentsByCompany: {},
   results: fallbackPeriodResults.toyota,
   activeId: fallbackPeriodResults.toyota.at(-1).id,
-  lastSyncedAtByCompany: {},
-  syncLogs: [],
+  lastUpdatedAtByCompany: {},
   stockChartSymbol: companies.toyota.stockSymbol,
   renderedStockChartSymbol: null,
   stockPrices: [],
@@ -476,15 +457,14 @@ const elements = {
   quarterSelect: document.querySelector("#quarter-select"),
   periodCaption: document.querySelector("#period-caption"),
   latestUpdate: document.querySelector("#latest-update"),
-  syncButton: document.querySelector("#sync-button"),
-  syncButtonLabel: document.querySelector("#sync-button-label"),
+  refreshButton: document.querySelector("#refresh-button"),
+  refreshButtonLabel: document.querySelector("#refresh-button-label"),
   metricCostCaption: document.querySelector("#metric-cost-caption"),
   metricProfitTitle: document.querySelector("#metric-profit-title"),
   metricProfitCaption: document.querySelector("#metric-profit-caption"),
   profitChartLabel: document.querySelector("#profit-chart-label"),
   marginChartTitle: document.querySelector("#margin-chart-title"),
   documentsBody: document.querySelector("#documents-body"),
-  xbrlFactsBody: document.querySelector("#xbrl-facts-body"),
   toast: document.querySelector("#toast"),
   marginValue: document.querySelector("#margin-value"),
   marginChange: document.querySelector("#margin-change"),
@@ -500,8 +480,6 @@ const elements = {
   financingCashFlow: document.querySelector("#financing-cash-flow"),
   otherCashFlowAdjustment: document.querySelector("#other-cash-flow-adjustment"),
   cashAndCashEquivalents: document.querySelector("#cash-and-cash-equivalents"),
-  syncLogList: document.querySelector("#sync-log-list"),
-  logClearButton: document.querySelector("#log-clear-button"),
   stockChart: document.querySelector("#stock-chart"),
   stockChartStatus: document.querySelector("#stock-chart-status"),
 };
@@ -713,43 +691,6 @@ function renderDocuments() {
       `,
     )
     .join("");
-}
-
-/**
- * 概要: EDINETのXBRLから抜き出した元の数値を一覧にします。DB登録前後の確認にも使えます。
- * 引数: なし。
- * 戻り値: なし。
- */
-function renderXbrlFacts() {
-  if (!elements.xbrlFactsBody) return;
-  const facts = state.edinetFactsByCompany[state.companyCode];
-  if (!facts) {
-    elements.xbrlFactsBody.innerHTML = '<tr><td colspan="5">Loading saved EDINET XBRL data from DB.</td></tr>';
-    return;
-  }
-  if (!facts.length) {
-    elements.xbrlFactsBody.innerHTML = '<tr><td colspan="5">No saved EDINET XBRL data found in DB.</td></tr>';
-    return;
-  }
-  elements.xbrlFactsBody.innerHTML = facts
-    .map(
-      (fact) => `
-        <tr>
-          <td>${fact.periodEnd ? formatDate(fact.periodEnd) : "-"}</td>
-          <td>${escapeHtml(fact.label)}</td>
-          <td>${escapeHtml(formatXbrlValue(fact))}</td>
-          <td>${escapeHtml(fact.unitRef ?? "-")}</td>
-          <td>${escapeHtml(fact.documentId)}</td>
-        </tr>
-      `,
-    )
-    .join("");
-}
-
-function formatXbrlValue(fact) {
-  const value = Number(fact.value);
-  if (!Number.isFinite(value)) return "-";
-  return value.toLocaleString("ja-JP");
 }
 
 function officialDocumentFiscalYear(document) {
@@ -1244,48 +1185,16 @@ function drawStockChart() {
   });
 }
 
-/**
- * 概要: Worker経由で株価を取りに行き、取れたらグラフを描きます。
- * 引数: なし。
- * 戻り値: 株価表示の更新が終わったことを示すPromise。
- */
-async function renderStockChart() {
-  const symbol = state.stockChartSymbol;
-  if (state.renderedStockChartSymbol === symbol) return;
-  state.renderedStockChartSymbol = symbol;
-  elements.stockChartStatus.textContent = `${symbol} の週足を読み込んでいます。`;
-
-  try {
-    const payload = await fetchJson(`${appConfig.api.stocks}/${encodeURIComponent(symbol)}`);
-    const result = payload.chart?.result?.[0];
-    const timestamps = result?.timestamp ?? [];
-    const quotes = result?.indicators?.quote?.[0] ?? {};
-    const stockPrices = timestamps
-      .map((timestamp, index) => ({
-        date: new Date(timestamp * 1000).toISOString().slice(0, 10),
-        open: quotes.open?.[index],
-        high: quotes.high?.[index],
-        low: quotes.low?.[index],
-        close: quotes.close?.[index],
-      }))
-      .filter((item) => [item.open, item.high, item.low, item.close].every(Number.isFinite));
-    if (state.stockChartSymbol !== symbol) return;
-    if (!stockPrices.length) throw new Error("株価データがありません。");
-    state.stockPrices = stockPrices;
-    elements.stockChartStatus.textContent = `${symbol} / 週足ローソク / 過去2年`;
-    drawStockChart();
-  } catch (error) {
-    if (state.stockChartSymbol !== symbol) return;
-    state.renderedStockChartSymbol = null;
-    state.stockPrices = [];
-    const { context: ctx, width, height } = prepareCanvas(elements.stockChart);
-    ctx.clearRect(0, 0, width, height);
-    ctx.fillStyle = "#9b998f";
-    ctx.font = '600 13px "Noto Sans JP"';
-    ctx.textAlign = "center";
-    ctx.fillText("株価データを取得できませんでした。Cloudflare Workers配信後に再度お試しください。", width / 2, height / 2);
-    elements.stockChartStatus.textContent = error.message;
-  }
+function renderStockChart() {
+  state.renderedStockChartSymbol = state.stockChartSymbol;
+  state.stockPrices = [];
+  const { context: ctx, width, height } = prepareCanvas(elements.stockChart);
+  ctx.clearRect(0, 0, width, height);
+  ctx.fillStyle = "#9b998f";
+  ctx.font = '600 13px "Noto Sans JP"';
+  ctx.textAlign = "center";
+  ctx.fillText("Workerを使わない構成のため、株価チャートは現在取得しません。", width / 2, height / 2);
+  elements.stockChartStatus.textContent = `${state.stockChartSymbol} / 株価取得なし`;
 }
 
 /**
@@ -1301,7 +1210,7 @@ function renderCompany() {
   elements.companyButtons.forEach((button) => {
     button.classList.toggle("active", button.dataset.company === state.companyCode);
   });
-  updateSyncButtonAvailability();
+  updateRefreshButtonAvailability();
 }
 
 /**
@@ -1314,7 +1223,6 @@ function render() {
   renderPicker();
   renderMetrics();
   renderDocuments();
-  renderXbrlFacts();
   renderAnnualFlow();
   renderCharts();
   renderStockChart();
@@ -1326,27 +1234,10 @@ function showToast(message) {
   window.setTimeout(() => elements.toast.classList.remove("show"), 3300);
 }
 
-function updateSyncButtonAvailability({ loading = false } = {}) {
-  elements.syncButton.disabled = loading;
-  elements.syncButton.title = "公式IR PDF一覧とEDINETの上期・通期データを更新します。";
-  elements.syncButtonLabel.textContent = "更新";
-}
-
-/**
- * 概要: 同期処理の進み具合をログとして残します。失敗した場所を後で見つけやすくします。
- * 引数: level - ログ種別、stage - 処理段階、message - 表示文、companyCode - 対象会社コード。
- * 戻り値: なし。
- */
-function addSyncLog(level, stage, message, companyCode = state.companyCode) {
-  state.syncLogs.unshift({
-    level,
-    stage,
-    message,
-    companyCode,
-    timestamp: new Date(),
-  });
-  state.syncLogs = state.syncLogs.slice(0, 30);
-  renderSyncLogs();
+function updateRefreshButtonAvailability() {
+  elements.refreshButton.disabled = false;
+  elements.refreshButton.title = "登録済みのPDF一覧を表示します。";
+  elements.refreshButtonLabel.textContent = "更新";
 }
 
 function escapeHtml(value) {
@@ -1358,410 +1249,50 @@ function escapeHtml(value) {
     .replaceAll("'", "&#039;");
 }
 
-function renderSyncLogs() {
-  if (!state.syncLogs.length) {
-    elements.syncLogList.innerHTML = '<p class="sync-log-empty">まだ同期処理は実行されていません。</p>';
-    return;
-  }
-  elements.syncLogList.innerHTML = state.syncLogs
-    .map(
-      (log) => `
-        <article class="sync-log-entry ${log.level}">
-          <span class="sync-log-status">${log.level === "error" ? "FAILED" : log.level === "info" ? "WAITING" : log.level === "unsupported" ? "UNSUPPORTED" : "SUCCESS"}</span>
-          <span class="sync-log-time">${new Intl.DateTimeFormat("ja-JP", {
-            hour: "2-digit",
-            minute: "2-digit",
-            second: "2-digit",
-          }).format(log.timestamp)}</span>
-          <strong>${escapeHtml(companies[log.companyCode]?.sourceName ?? log.companyCode)}</strong>
-          <small>${escapeHtml(log.stage)}</small>
-          <p>${escapeHtml(log.message)}</p>
-        </article>
-      `,
-    )
-    .join("");
-}
-
 function updateLatestUpdate(companyCode = state.companyCode) {
-  const syncedAt = state.lastSyncedAtByCompany[companyCode];
-  elements.latestUpdate.textContent = syncedAt
+  const updatedAt = state.lastUpdatedAtByCompany[companyCode];
+  elements.latestUpdate.textContent = updatedAt
     ? `Last updated ${new Intl.DateTimeFormat("ja-JP", {
         year: "numeric",
         month: "short",
         day: "numeric",
-      }).format(new Date(syncedAt))}`
+      }).format(new Date(updatedAt))}`
     : "Last updated —";
 }
 
-function apiHeaders(config) {
-  return {
-    apikey: config.supabaseAnonKey,
-    Authorization: `Bearer ${config.supabaseAnonKey}`,
-    "Content-Type": "application/json",
-  };
-}
-
 /**
- * 概要: fetchを少し便利にした関数です。時間切れやエラーを、画面に出しやすい形にします。
- * 引数: url - 取得先URL、options - fetchの追加設定。
- * 戻り値: JSONとして読み取ったレスポンスを返すPromise。
- */
-async function fetchJson(url, options = {}) {
-  const controller = new AbortController();
-  const timeoutMs = options.timeoutMs ?? 15000;
-  const timeout = window.setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    const { timeoutMs: _timeoutMs, ...fetchOptions } = options;
-    const response = await fetch(url, { ...fetchOptions, signal: options.signal ?? controller.signal });
-    if (!response.ok) {
-      const payload = await response.json().catch(() => ({}));
-      const detail = payload.error ?? payload.message;
-      const detailText = detail ? `: ${detail}` : "";
-      const stage = payload.stage ? ` [${payload.stage}]` : "";
-      throw new Error(
-        `データ取得に失敗しました (${response.status})${stage}${detailText} @ ${new URL(url, window.location.href).pathname}`,
-      );
-    }
-    const text = await response.text();
-    return text ? JSON.parse(text) : null;
-  } catch (error) {
-    if (error.name === "AbortError") {
-      throw new Error(`${Math.round(timeoutMs / 1000)}秒以内に応答がありません @ ${new URL(url, window.location.href).pathname}`);
-    }
-    throw error;
-  } finally {
-    window.clearTimeout(timeout);
-  }
-}
-
-async function fetchJsonWithSyncLog(url, options, { companyCode, stage, description }) {
-  const startedAt = performance.now();
-  addSyncLog("info", `${stage} 開始`, `${description}を問い合わせています。`, companyCode);
-  try {
-    const payload = await fetchJson(url, options);
-    const elapsed = Math.round(performance.now() - startedAt);
-    addSyncLog("success", `${stage} 完了`, `${description}を取得しました。${elapsed}ms`, companyCode);
-    return payload;
-  } catch (error) {
-    const elapsed = Math.round(performance.now() - startedAt);
-    addSyncLog("error", `${stage} 失敗`, `${description}で停止しました。${elapsed}ms: ${error.message}`, companyCode);
-    throw error;
-  }
-}
-
-/**
- * 概要: Supabaseに保存済みの決算データ・EDINETデータを読み込みます。
- * 引数: companyCode - 対象会社コード、config - アプリ設定。
- * 戻り値: 前回同期日時と期間データ件数を返すPromise。
- */
-async function loadCachedCompanyData(companyCode, config) {
-  addSyncLog("success", "DB読込開始", "保存済みデータと前回取得日時を確認します。", companyCode);
-  const baseUrl = `${config.supabaseUrl}/rest/v1`;
-  const headers = apiHeaders(config);
-  const [companiesData, resultsData, flowsData, documentsData, factsData] = await Promise.all([
-    fetchJsonWithSyncLog(
-      `${baseUrl}/earn_companies?code=eq.${companyCode}&select=last_synced_at`,
-      { headers },
-      { companyCode, stage: "企業マスタ読込", description: "前回同期日時" },
-    ),
-    fetchJsonWithSyncLog(
-      `${baseUrl}/earn_period_results?company_code=eq.${companyCode}&select=*&order=period_end.asc`,
-      { headers },
-      { companyCode, stage: "期間データ読込", description: "保存済み上期・通期データ" },
-    ),
-    fetchJsonWithSyncLog(
-      `${baseUrl}/earn_annual_profit_flows?company_code=eq.${companyCode}&select=*&order=synced_at.desc&limit=1`,
-      { headers },
-      { companyCode, stage: "年次CF読込", description: "保存済み年次キャッシュフロー" },
-    ),
-    fetchJsonWithSyncLog(
-      `${baseUrl}/earn_edinet_documents?company_code=eq.${companyCode}&select=*&order=submitted_at.desc`,
-      { headers },
-      { companyCode, stage: "EDINET書類読込", description: "保存済みEDINET書類" },
-    ),
-    fetchJsonWithSyncLog(
-      `${baseUrl}/earn_edinet_facts?company_code=eq.${companyCode}&select=*&order=period_end.desc,display_order.asc&limit=80`,
-      { headers },
-      { companyCode, stage: "EDINET XBRL", description: "saved EDINET XBRL facts" },
-    ),
-  ]);
-
-  state.lastSyncedAtByCompany[companyCode] = companiesData[0]?.last_synced_at ?? null;
-  if (resultsData.length) state.resultsByCompany[companyCode] = resultsData.map(normalizeResult);
-  if (flowsData.length) annualAnalyses[companyCode] = normalizeAnnualFlow({
-    ...annualAnalyses[companyCode],
-    ...flowsData[0],
-  });
-  state.edinetDocumentsByCompany[companyCode] = documentsData.map(normalizeEdinetDocument);
-  state.edinetFactsByCompany[companyCode] = factsData.map(normalizeEdinetFact);
-  addSyncLog(
-    "success",
-    "DB読込完了",
-    `${resultsData.length}件の上期・通期データを読み込みました。`,
-    companyCode,
-  );
-  if (resultsData.length) {
-    addSyncLog("success", "データ種別", `DB保存済み: ${registeredDataDescription}`, companyCode);
-  }
-  return {
-    lastSyncedAt: state.lastSyncedAtByCompany[companyCode],
-    periodCount: resultsData.length,
-  };
-}
-
-/**
- * 概要: 会社の公式IRページから、決算PDFのリンク一覧を取りに行きます。
+ * 概要: 登録済みの決算データから、PDFリンク一覧を作ります。
  * 引数: companyCode - 対象会社コード。
  * 戻り値: PDF一覧を含む結果を返すPromise。
  */
 async function loadOfficialIrDocuments(companyCode) {
-  addSyncLog("info", "公式IR資料取得 開始", "企業サイトからPDFリンクを確認します。", companyCode);
-  try {
-    const payload = await fetchJson(`${appConfig.api.officialIr}/${encodeURIComponent(companyCode)}`);
-    state.officialIrDocumentsByCompany[companyCode] = payload.documents ?? [];
-    addSyncLog("success", "公式IR資料取得 完了", `${payload.documents?.length ?? 0}件のPDFリンクを読み込みました。`, companyCode);
-    return payload;
-  } catch (error) {
-    state.officialIrDocumentsByCompany[companyCode] = [];
-    addSyncLog("error", "公式IR資料取得 失敗", error.message, companyCode);
-    return { documents: [] };
-  }
-}
-
-/**
- * 概要: EDINETから最近の書類とXBRL数値を取り、DBへ保存して画面用データへ変換します。
- * 引数: companyCode - 対象会社コード、config - アプリ設定。
- * 戻り値: 保存件数と変換件数を返すPromise。
- */
-async function syncTodayEdinetDocuments(companyCode, config) {
-  const configuredHistoryDays = Number(config.edinet?.historyDays);
-  const configuredBatchDays = Number(config.edinet?.batchDays);
-  const historyDays = Number.isInteger(configuredHistoryDays) && configuredHistoryDays > 0
-    ? Math.min(configuredHistoryDays, 60)
-    : 45;
-  const batchDays = Number.isInteger(configuredBatchDays) && configuredBatchDays > 0
-    ? Math.min(configuredBatchDays, 31)
-    : 15;
-  const batches = Math.ceil(historyDays / batchDays);
-  let saved = 0;
-  let promoted = 0;
-  addSyncLog("info", "EDINET同期 開始", `金融庁EDINET APIから過去${historyDays}日分の対象企業の書類を取得し、DBへ保存します。`, companyCode);
-  try {
-    for (let index = 0; index < batches; index += 1) {
-      const date = new Date();
-      date.setUTCDate(date.getUTCDate() - index * batchDays);
-      const days = Math.min(batchDays, historyDays - index * batchDays);
-      const endDate = date.toISOString().slice(0, 10);
-      const payload = await fetchJson(
-        `${appConfig.api.edinetSync}?date=${endDate}&days=${days}&company=${encodeURIComponent(companyCode)}`,
-        { method: "POST", timeoutMs: 120000 },
-      );
-      if (payload.edinetError) {
-        addSyncLog("error", "EDINET同期 失敗", payload.edinetError, companyCode);
-        return { ...payload, saved, edinetSyncFailed: true };
-      }
-      if (!payload.persisted && payload.documents?.length) {
-        await fetchJson(`${config.supabaseUrl}/rest/v1/earn_edinet_documents?on_conflict=id`, {
-          method: "POST",
-          headers: {
-            ...apiHeaders(config),
-            Prefer: "resolution=merge-duplicates,return=minimal",
-          },
-          body: JSON.stringify(payload.documents),
-        });
-      }
-      if (!payload.factsPersisted && payload.facts?.length) {
-        await fetchJson(`${config.supabaseUrl}/rest/v1/earn_edinet_facts?on_conflict=id`, {
-          method: "POST",
-          headers: {
-            ...apiHeaders(config),
-            Prefer: "resolution=merge-duplicates,return=minimal",
-          },
-          body: JSON.stringify(payload.facts),
-        });
-      }
-      if (payload.persistenceError) {
-        addSyncLog("error", "Worker保存 失敗", payload.persistenceError, companyCode);
-      }
-      promoted += payload.promoted?.periodResults ?? 0;
-      saved += payload.facts?.length ?? payload.documents?.length ?? 0;
-    }
-    addSyncLog("success", "EDINET同期 完了", `${saved}件のXBRLデータを保存し、${promoted}件の上期・通期データを更新しました。`, companyCode);
-    await loadCachedCompanyData(companyCode, config);
-    return { saved, promoted };
-  } catch (error) {
-    addSyncLog("error", "EDINET同期 失敗", error.message, companyCode);
-    return { saved: 0, edinetSyncFailed: true };
-  }
-}
-
-/**
- * 概要: 初回だけ、config.jsonに書いた既知の日付からEDINETデータをまとめて取り込みます。
- * 引数: companyCode - 対象会社コード。
- * 戻り値: 実行有無、保存件数、変換件数を返すPromise。
- */
-async function bootstrapEdinetDocuments(companyCode) {
-  const dates = appConfig.edinet?.bootstrapDates?.[companyCode] ?? [];
-  if (!dates.length) return { attempted: false, saved: 0, promoted: 0 };
-  let saved = 0;
-  let promoted = 0;
-  addSyncLog("info", "EDINET初期化 開始", `${dates.length}件の既知提出日から上期・通期データを取得します。`, companyCode);
-  for (const date of dates) {
-    const payload = await fetchJson(
-      `${appConfig.api.edinetSync}?date=${date}&days=1&company=${encodeURIComponent(companyCode)}`,
-      { method: "POST", timeoutMs: 120000 },
-    );
-    if (payload.edinetError) throw new Error(payload.edinetError);
-    if (payload.persistenceError) throw new Error(payload.persistenceError);
-    saved += payload.factsSaved ?? payload.facts?.length ?? 0;
-    promoted += payload.promoted?.periodResults ?? 0;
-  }
-  addSyncLog("success", "EDINET初期化 完了", `${saved}件のXBRL数値から${promoted}件の期間データを更新しました。`, companyCode);
-  return { attempted: true, saved, promoted };
-}
-
-/**
- * 概要: 「今日すでに同期したか」を日本時間で判定します。
- * 引数: value - 同期日時。
- * 戻り値: 今日同期済みならtrue。
- */
-function syncedToday(value) {
-  if (!value) return false;
-  const dateInJapan = (date) => new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Tokyo",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(date);
-  return dateInJapan(new Date(value)) === dateInJapan(new Date());
+  const rows = fallbackResults[companyCode] ?? [];
+  const documents = [...new Map(rows
+    .filter((row) => row.sourceUrl)
+    .map((row) => [row.sourceUrl, {
+      title: `FY${row.fiscalYear} Q${row.quarter} financial results`,
+      url: row.sourceUrl,
+    }])).values()];
+  state.officialIrDocumentsByCompany[companyCode] = documents;
+  state.lastUpdatedAtByCompany[companyCode] = new Date().toISOString();
+  return { documents };
 }
 
 /**
  * 概要: 会社を開いたときや更新ボタンを押したときの、データ更新の中心処理です。
- * 引数: force - 同期を試すか、notify - トースト通知を出すか、bypassFreshness - 当日同期済み判定を無視するか。
+ * 引数: notify - トースト通知を出すか。
  * 戻り値: 更新処理が終わったことを示すPromise。
  */
-async function refreshCompany({ force = false, notify = false, bypassFreshness = false } = {}) {
-  const config = appConfig;
+async function refreshCompany({ notify = false } = {}) {
   const companyCode = state.companyCode;
-  elements.syncButton.classList.add("loading");
-  updateSyncButtonAvailability({ loading: true });
-
-  try {
-    if (!config.supabaseUrl || !config.supabaseAnonKey) {
-      const payload = await loadOfficialIrDocuments(companyCode);
-      if (state.companyCode === companyCode) render();
-      if (notify) showToast(`${payload.documents?.length ?? 0}件の公式IR PDFを取得しました。`);
-      return;
-    }
-
-    const [cached] = await Promise.all([
-      loadCachedCompanyData(companyCode, config),
-      loadOfficialIrDocuments(companyCode),
-    ]);
-    const bootstrap = force && cached.periodCount === 0
-      ? await bootstrapEdinetDocuments(companyCode)
-      : { attempted: false };
-    const needsEdinetSync = force
-      && (bootstrap.attempted || bypassFreshness || !syncedToday(state.lastSyncedAtByCompany[companyCode]));
-    const payload = needsEdinetSync ? await syncTodayEdinetDocuments(companyCode, config) : null;
-
-    if (state.companyCode === companyCode) {
-      state.results = state.resultsByCompany[companyCode];
-      state.activeId = state.results.at(-1)?.id ?? null;
-      updateLatestUpdate(companyCode);
-      render();
-    }
-    if (notify || payload) {
-      showToast(
-        payload?.edinetSyncFailed
-          ? "公式IR PDF一覧を更新しました。EDINET同期の詳細はSync Logを確認してください。"
-          : payload
-          ? `${payload.saved}件のXBRL数値を保存し、${payload.promoted}件の上期・通期データを更新しました。`
-          : "保存済みの最新データを表示しています。",
-      );
-    }
-  } catch (error) {
-    addSyncLog("error", "同期失敗", error.message, companyCode);
-    showToast(error.message);
-  } finally {
-    elements.syncButton.classList.remove("loading");
-    updateSyncButtonAvailability();
+  const payload = await loadOfficialIrDocuments(companyCode);
+  if (state.companyCode === companyCode) {
+    state.results = state.resultsByCompany[companyCode];
+    state.activeId = state.results.at(-1)?.id ?? null;
+    updateLatestUpdate(companyCode);
+    render();
   }
-}
-
-/**
- * 概要: DBのsnake_caseと、画面で使うcamelCaseをそろえます。
- * 引数: item - DBまたは画面由来の決算データ。
- * 戻り値: 画面で使いやすい形に整えた決算データ。
- */
-function normalizeResult(item) {
-  return {
-    id: item.id,
-    companyCode: item.company_code ?? item.companyCode,
-    fiscalYear: item.fiscal_year ?? item.fiscalYear,
-    periodType: item.period_type ?? item.periodType,
-    periodStart: item.period_start ?? item.periodStart,
-    periodEnd: item.period_end ?? item.periodEnd,
-    revenue: item.revenue,
-    operatingCost: item.operating_cost ?? item.operatingCost ?? null,
-    operatingIncome: item.operating_income ?? item.operatingIncome ?? null,
-    pretaxIncome: item.pretax_income ?? item.pretaxIncome ?? null,
-    netIncome: item.net_income ?? item.netIncome,
-    sourceUrl: item.source_url ?? item.sourceUrl,
-  };
-}
-
-function normalizeEdinetDocument(item) {
-  return {
-    id: item.id,
-    companyCode: item.company_code ?? item.companyCode,
-    edinetCode: item.edinet_code ?? item.edinetCode,
-    filerName: item.filer_name ?? item.filerName,
-    docTypeCode: item.doc_type_code ?? item.docTypeCode,
-    description: item.description,
-    periodStart: item.period_start ?? item.periodStart,
-    periodEnd: item.period_end ?? item.periodEnd,
-    submittedAt: item.submitted_at ?? item.submittedAt,
-  };
-}
-
-function normalizeEdinetFact(item) {
-  return {
-    id: item.id,
-    documentId: item.document_id ?? item.documentId,
-    companyCode: item.company_code ?? item.companyCode,
-    concept: item.concept,
-    label: item.label,
-    value: item.value,
-    unitRef: item.unit_ref ?? item.unitRef,
-    decimals: item.decimals,
-    contextRef: item.context_ref ?? item.contextRef,
-    periodStart: item.period_start ?? item.periodStart,
-    periodEnd: item.period_end ?? item.periodEnd,
-    submittedAt: item.submitted_at ?? item.submittedAt,
-    displayOrder: item.display_order ?? item.displayOrder,
-  };
-}
-
-function normalizeAnnualFlow(item) {
-  return {
-    previousFiscalYear: item.previous_fiscal_year ?? item.previousFiscalYear,
-    currentFiscalYear: item.current_fiscal_year ?? item.currentFiscalYear,
-    previousRevenue: item.previous_revenue ?? item.previousRevenue,
-    currentRevenue: item.current_revenue ?? item.currentRevenue,
-    previousOperatingCost: item.previous_operating_cost ?? item.previousOperatingCost,
-    currentOperatingCost: item.current_operating_cost ?? item.currentOperatingCost,
-    previousOperatingIncome: item.previous_operating_income ?? item.previousOperatingIncome,
-    currentOperatingIncome: item.current_operating_income ?? item.currentOperatingIncome,
-    operatingCashFlow: item.operating_cash_flow ?? item.operatingCashFlow,
-    investingCashFlow: item.investing_cash_flow ?? item.investingCashFlow,
-    financingCashFlow: item.financing_cash_flow ?? item.financingCashFlow ?? null,
-    previousCashAndCashEquivalents:
-      item.previous_cash_and_cash_equivalents ?? item.previousCashAndCashEquivalents ?? null,
-    cashAndCashEquivalents: item.cash_and_cash_equivalents ?? item.cashAndCashEquivalents ?? null,
-    expenses: item.expense_breakdown ?? item.expenses,
-  };
+  if (notify) showToast(`${payload.documents?.length ?? 0}件の登録済みPDFを表示しました。`);
 }
 
 // ここから下は、ユーザー操作に反応するイベント設定です。
@@ -1789,18 +1320,10 @@ elements.companyButtons.forEach((button) => {
     state.activeId = state.results.at(-1)?.id ?? null;
     updateLatestUpdate();
     render();
-    await refreshCompany({ force: true });
+    await refreshCompany();
   });
 });
-elements.syncButton.addEventListener("click", () => refreshCompany({
-  force: true,
-  notify: true,
-  bypassFreshness: true,
-}));
-elements.logClearButton.addEventListener("click", () => {
-  state.syncLogs = [];
-  renderSyncLogs();
-});
+elements.refreshButton.addEventListener("click", () => refreshCompany({ notify: true }));
 window.addEventListener("resize", () => {
   renderCharts();
   if (state.stockPrices.length) drawStockChart();
@@ -1809,4 +1332,4 @@ window.addEventListener("resize", () => {
 // ページを開いた直後に、まず予備データで描画してから最新データを取りに行きます。
 updateLatestUpdate();
 render();
-refreshCompany({ force: true });
+refreshCompany();

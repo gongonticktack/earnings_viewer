@@ -314,7 +314,7 @@ select {
   font-family: inherit;
 }
 
-.sync-button {
+.refresh-button {
   display: flex;
   align-items: center;
   padding: 11px 15px;
@@ -329,22 +329,22 @@ select {
   transition: 180ms ease;
 }
 
-.sync-button:hover {
+.refresh-button:hover {
   background: #e0c58f;
   box-shadow: 0 8px 24px rgba(214, 183, 122, 0.15);
   transform: translateY(-1px);
 }
 
-.sync-button:disabled {
+.refresh-button:disabled {
   cursor: wait;
   opacity: 0.66;
 }
 
-.sync-icon {
+.refresh-icon {
   font-size: 16px;
 }
 
-.sync-button.loading .sync-icon {
+.refresh-button.loading .refresh-icon {
   animation: spin 1s linear infinite;
 }
 
@@ -626,96 +626,6 @@ select {
   z-index: 1;
   top: 0;
   background: var(--panel-strong);
-}
-
-.sync-log-panel {
-  margin-top: 17px;
-}
-
-.log-clear-button {
-  padding: 7px 10px;
-  border: 1px solid var(--line);
-  border-radius: 4px;
-  color: var(--muted);
-  cursor: pointer;
-  background: transparent;
-  font-size: 10px;
-  transition: 160ms ease;
-}
-
-.log-clear-button:hover {
-  border-color: var(--line-strong);
-  color: var(--text);
-}
-
-.sync-log-list {
-  display: grid;
-  max-height: 260px;
-  margin-top: 15px;
-  overflow-y: auto;
-  gap: 7px;
-}
-
-.sync-log-empty {
-  padding: 14px 0;
-  color: var(--dim);
-  font-size: 11px;
-}
-
-.sync-log-entry {
-  display: grid;
-  align-items: center;
-  padding: 10px;
-  border: 1px solid var(--line);
-  border-radius: 5px;
-  gap: 5px 9px;
-  grid-template-columns: auto auto auto 1fr;
-  background: rgba(255, 255, 255, 0.018);
-}
-
-.sync-log-status,
-.sync-log-time,
-.sync-log-entry strong,
-.sync-log-entry small {
-  font: 700 9px/1 var(--font-display);
-  letter-spacing: 0.05em;
-}
-
-.sync-log-status {
-  padding: 3px 5px;
-  border-radius: 3px;
-  color: var(--green);
-  background: rgba(130, 186, 142, 0.1);
-}
-
-.sync-log-entry.error .sync-log-status {
-  color: var(--red);
-  background: rgba(216, 134, 127, 0.1);
-}
-
-.sync-log-entry.info .sync-log-status {
-  color: var(--gold-soft);
-  background: rgba(214, 183, 122, 0.1);
-}
-
-.sync-log-entry.unsupported .sync-log-status {
-  color: var(--muted);
-  background: rgba(155, 153, 143, 0.12);
-}
-
-.sync-log-time,
-.sync-log-entry small {
-  color: var(--dim);
-}
-
-.sync-log-entry strong {
-  color: var(--gold-soft);
-}
-
-.sync-log-entry p {
-  color: var(--muted);
-  font-size: 10px;
-  grid-column: 1 / -1;
 }
 
 .annual-flow-panel {

@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta
       name="description"
-      content="複数企業のEDINET半期・通期決算を収集・可視化するダッシュボード"
+      content="複数企業の決算情報、公式IR PDF、株価を可視化するダッシュボード"
     />
     <title>Earnings Atelier</title>
     <link rel="icon" type="image/png" href="./earn.png" />
@@ -71,9 +71,9 @@
           </div>
           <div class="topbar-actions">
             <span class="latest-update" id="latest-update">Last updated —</span>
-            <button class="sync-button" id="sync-button" type="button">
-              <span class="sync-icon">↻</span>
-              <span id="sync-button-label">更新</span>
+            <button class="refresh-button" id="refresh-button" type="button">
+              <span class="refresh-icon">↻</span>
+              <span id="refresh-button-label">更新</span>
             </button>
           </div>
         </header>
@@ -83,7 +83,7 @@
             <p class="eyebrow" id="company-name">TOYOTA MOTOR CORPORATION</p>
             <h2>Financial Overview</h2>
             <p class="hero-description">
-              EDINETから取得した上期・通期の累計業績を、提出期間ベースで可視化します。
+              公式IR資料をもとにした業績推移と、公式PDF・株価データをまとめて確認できます。
             </p>
           </div>
           <div class="period-picker">
@@ -244,12 +244,12 @@
             <span class="flow-period">WEEKLY</span>
           </div>
           <p class="panel-description">
-            表示中の企業の週足ローソクチャートです。市場データは無料の株価JSONから読み込みます。
+            Workerを使わない静的構成では、株価チャートの自動取得は行いません。
           </p>
           <div class="stock-chart">
             <canvas id="stock-chart"></canvas>
           </div>
-          <p class="stock-chart-status" id="stock-chart-status">週足を読み込んでいます。</p>
+          <p class="stock-chart-status" id="stock-chart-status">株価取得なし</p>
         </section>
 
         <section class="panel documents-panel" id="documents">
@@ -283,42 +283,6 @@
           </div>
         </section>
 
-        <section class="panel documents-panel" id="edinet-xbrl">
-          <div class="panel-heading">
-            <div>
-              <p class="eyebrow">EDINET XBRL</p>
-              <h3>Structured Data</h3>
-            </div>
-            <span class="flow-period">DB</span>
-          </div>
-          <div class="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Period</th>
-                  <th>Fact</th>
-                  <th>Value</th>
-                  <th>Unit</th>
-                  <th>Document ID</th>
-                </tr>
-              </thead>
-              <tbody id="xbrl-facts-body"></tbody>
-            </table>
-          </div>
-        </section>
-
-        <section class="panel sync-log-panel" aria-label="同期ログ">
-          <div class="panel-heading">
-            <div>
-              <p class="eyebrow">CONNECTION ACTIVITY</p>
-              <h3>Sync Log</h3>
-            </div>
-            <button class="log-clear-button" id="log-clear-button" type="button">ログを消去</button>
-          </div>
-          <div class="sync-log-list" id="sync-log-list">
-            <p class="sync-log-empty">まだ同期処理は実行されていません。</p>
-          </div>
-        </section>
       </main>
     </div>
 
