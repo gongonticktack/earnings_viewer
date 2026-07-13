@@ -330,121 +330,34 @@ const fallbackResults = {
 };
 
 /**
- * 概要: 予備データの四半期情報を、画面で使う「上期」と「通期」の形へまとめます。
+ * 概要: 予備データの四半期情報を、画面で使いやすい順番と形に整えます。
  * 引数: resultsByCompany - 会社ごとの四半期予備データ。
- * 戻り値: 会社ごとの上期・通期データ。
+ * 戻り値: 会社ごとの四半期データ。
  */
-function cumulativeFallbackPeriods(resultsByCompany) {
-  const sumMetric = (rows, key) => rows.every((row) => row[key] !== null && row[key] !== undefined)
-    ? rows.reduce((total, row) => total + row[key], 0)
-    : null;
-  return Object.fromEntries(Object.entries(resultsByCompany).map(([companyCode, rows]) => {
-    const byYear = new Map();
-    for (const row of rows) {
-      if (!byYear.has(row.fiscalYear)) byYear.set(row.fiscalYear, []);
-      byYear.get(row.fiscalYear).push(row);
-    }
-    const periods = [];
-    for (const [fiscalYear, yearRows] of byYear) {
-      const ordered = [...yearRows].sort((a, b) => a.quarter - b.quarter);
-      for (const definition of [
-        { periodType: "H1", required: 2, rows: ordered.filter((row) => row.quarter <= 2) },
-        { periodType: "FY", required: 4, rows: ordered },
-      ]) {
-        if (definition.rows.length !== definition.required) continue;
-        const last = definition.rows.at(-1);
-        periods.push({
-          id: `${companyCode}-fy${fiscalYear}-${definition.periodType.toLowerCase()}`,
-          companyCode,
-          fiscalYear,
-          periodType: definition.periodType,
-          periodStart: null,
-          periodEnd: last.periodEnd,
-          revenue: sumMetric(definition.rows, "revenue"),
-          operatingCost: sumMetric(definition.rows, "operatingCost"),
-          operatingIncome: sumMetric(definition.rows, "operatingIncome"),
-          pretaxIncome: sumMetric(definition.rows, "pretaxIncome"),
-          netIncome: sumMetric(definition.rows, "netIncome"),
-          sourceUrl: last.sourceUrl,
-        });
-      }
-    }
-    return [companyCode, periods];
-  }));
+function normalizeFallbackQuarterlyResults(resultsByCompany) {
+  return Object.fromEntries(Object.entries(resultsByCompany).map(([companyCode, rows]) => [
+    companyCode,
+    rows
+      .map((row) => ({
+        ...row,
+        companyCode,
+        periodType: `Q${row.quarter}`,
+        periodStart: null,
+        pretaxIncome: row.pretaxIncome ?? null,
+      }))
+      .sort((a, b) => a.fiscalYear - b.fiscalYear || a.quarter - b.quarter),
+  ]));
 }
 
-const fallbackPeriodResults = cumulativeFallbackPeriods(fallbackResults);
-
-// 年間のキャッシュフロー表示に使う登録済みデータです。
-const annualAnalyses = {
-  toyota: {
-    previousFiscalYear: "FY2025",
-    currentFiscalYear: "FY2026",
-    previousOperatingIncome: 4795586,
-    currentOperatingIncome: 3766216,
-    previousRevenue: 48036704,
-    currentRevenue: 50684952,
-    previousOperatingCost: 43241118,
-    currentOperatingCost: 46918736,
-    operatingCashFlow: 5472920,
-    investingCashFlow: -1520307,
-    financingCashFlow: -536659,
-    previousCashAndCashEquivalents: 8982404,
-    cashAndCashEquivalents: 12659622,
-    expenses: [
-      { label: "売上原価", value: 39141418 },
-      { label: "金融事業に係る金融費用", value: 3079794 },
-      { label: "販売費及び一般管理費", value: 4697524 },
-    ],
-  },
-  ntt: {
-    previousFiscalYear: "FY2024",
-    currentFiscalYear: "FY2025",
-    previousOperatingIncome: 1649571,
-    currentOperatingIncome: 1706221,
-    previousRevenue: 13704727,
-    currentRevenue: 14409121,
-    previousOperatingCost: 12055156,
-    currentOperatingCost: 12702900,
-    operatingCashFlow: 1485190,
-    investingCashFlow: -1023424,
-    financingCashFlow: 441332,
-    previousCashAndCashEquivalents: 1000994,
-    cashAndCashEquivalents: 1921882,
-    expenses: [
-      { label: "人件費", value: 3214887 },
-      { label: "経費", value: 7207918 },
-      { label: "減価償却費", value: 1790983 },
-      { label: "固定資産除却費", value: 119782 },
-      { label: "減損損失", value: 80189 },
-      { label: "租税公課", value: 289141 },
-    ],
-  },
-  softbank: {
-    previousFiscalYear: "FY2024",
-    currentFiscalYear: "FY2025",
-    previousOperatingIncome: 989016,
-    currentOperatingIncome: 1042576,
-    previousRevenue: 6544349,
-    currentRevenue: 7038680,
-    previousOperatingCost: 5555333,
-    currentOperatingCost: 5996104,
-    operatingCashFlow: 1393760,
-    investingCashFlow: -1270806,
-    financingCashFlow: -136854,
-    previousCashAndCashEquivalents: 1435525,
-    cashAndCashEquivalents: 1438799,
-    expenses: [{ label: "営業費用合計", value: 5996104 }],
-  },
-};
+const fallbackQuarterlyResults = normalizeFallbackQuarterlyResults(fallbackResults);
 
 // 画面の今の状態を1か所に集めています。会社を変えたり、PDF一覧を読んだりするとここが変わります。
 const state = {
   companyCode: "toyota",
-  resultsByCompany: { ...fallbackPeriodResults },
+  resultsByCompany: { ...fallbackQuarterlyResults },
   officialIrDocumentsByCompany: {},
-  results: fallbackPeriodResults.toyota,
-  activeId: fallbackPeriodResults.toyota.at(-1).id,
+  results: fallbackQuarterlyResults.toyota,
+  activeId: fallbackQuarterlyResults.toyota.at(-1).id,
   lastUpdatedAtByCompany: {},
   stockChartSymbol: companies.toyota.stockSymbol,
   renderedStockChartSymbol: null,
@@ -535,11 +448,11 @@ function formatDate(dateString) {
 }
 
 function periodTypeLabel(result) {
-  return result.periodType === "H1" ? "上期累計" : "通期累計";
+  return `第${result.quarter}四半期`;
 }
 
 function chartPeriodLabel(result) {
-  return `FY${String(result.fiscalYear)} ${result.periodType}`;
+  return `FY${String(result.fiscalYear)} Q${result.quarter}`;
 }
 
 /**
@@ -556,13 +469,6 @@ function activeYearResults() {
   return year ? state.results.filter((item) => item.fiscalYear === year) : [];
 }
 
-function activeAnnualAnalysis() {
-  const analysis = annualAnalyses[state.companyCode];
-  const year = activeResult()?.fiscalYear;
-  const analysisYear = Number(String(analysis?.currentFiscalYear ?? "").match(/\d{4}/)?.[0]);
-  return analysis && (!year || analysisYear === year) ? analysis : null;
-}
-
 /**
  * 概要: 前年の同じ期間を探します。売上が増えたか減ったかを比べるためです。
  * 引数: result - 比較元の決算データ。
@@ -571,7 +477,7 @@ function activeAnnualAnalysis() {
 function comparisonResult(result) {
   if (!result) return null;
   return state.results.find((item) => (
-    item.fiscalYear === result.fiscalYear - 1 && item.periodType === result.periodType
+    item.fiscalYear === result.fiscalYear - 1 && item.quarter === result.quarter
   )) ?? null;
 }
 
@@ -584,7 +490,9 @@ function renderPicker() {
   const years = [...new Set(state.results.map((result) => result.fiscalYear))].sort((a, b) => b - a);
   const current = activeResult();
   const selectedYear = current?.fiscalYear ?? years[0];
-  const periods = state.results.filter((result) => result.fiscalYear === selectedYear);
+  const periods = state.results
+    .filter((result) => result.fiscalYear === selectedYear)
+    .sort((a, b) => a.quarter - b.quarter);
 
   elements.yearSelect.innerHTML = years
     .map((year) => `<option value="${year}">${year}年度</option>`)
@@ -940,52 +848,21 @@ function drawMarginChart() {
   });
 }
 
-/**
- * 概要: 営業利益から現金残高までの増減を、滝のようなグラフで描きます。
- * 引数: なし。
- * 戻り値: なし。
- */
 function drawWaterfallChart() {
   const canvas = document.querySelector("#waterfall-chart");
-  const analysis = activeAnnualAnalysis();
-  if (!analysis) {
-    drawEmptyChart(canvas, "年次キャッシュフロー未登録");
+  const result = activeResult();
+  if (!result) {
+    drawEmptyChart(canvas, "四半期データ未登録");
     return;
   }
   const { context: ctx, width, height } = prepareCanvas(canvas);
-  const previousCash = analysis.previousCashAndCashEquivalents;
-  const currentCash = analysis.cashAndCashEquivalents;
-  const flowBars = [
-    { label: "売上収益", value: analysis.currentRevenue },
-    { label: "原価・人件費\nなど", value: -analysis.currentOperatingCost },
-    { label: "投資活動", value: analysis.investingCashFlow },
-    { label: "財務活動", value: analysis.financingCashFlow },
-  ].filter((bar) => bar.value !== null);
-  const canReconcile = previousCash !== null && currentCash !== null;
-  let runningTotal = canReconcile ? previousCash : 0;
-  const bars = canReconcile
-    ? [{ label: "前期末\n現金", value: previousCash, start: 0, end: previousCash, total: true }]
-    : [];
-
-  flowBars.forEach((bar) => {
-    const start = runningTotal;
-    runningTotal += bar.value;
-    bars.push({ ...bar, start, end: runningTotal });
-  });
-
-  if (canReconcile) {
-    const adjustment = calculateProfitCashAdjustment(analysis);
-    if (adjustment !== 0) {
-      bars.push({ label: "その他\n調整", value: adjustment, start: runningTotal, end: currentCash });
-    }
-    bars.push({
-      label: "今期末\n現金",
-      value: currentCash,
-      start: currentCash,
-      end: currentCash,
-      total: true,
-    });
-  }
+  const profit = profitValue(result);
+  const bars = [
+    { label: "売上\n収益", value: result.revenue },
+    { label: "営業\n費用", value: result.operatingCost === null ? null : -result.operatingCost },
+    { label: usesPretaxMetric(result) ? "税引前\n利益" : "営業\n利益", value: profit },
+    { label: "純利益", value: result.netIncome },
+  ].filter((bar) => bar.value !== null && bar.value !== undefined);
 
   const padding = { top: 36, right: 12, bottom: 47, left: 12 };
   const chartWidth = width - padding.left - padding.right;
@@ -993,7 +870,7 @@ function drawWaterfallChart() {
   const gap = chartWidth / bars.length;
   const barWidth = Math.min(76, gap * 0.54);
   const compactLabels = chartWidth < 360;
-  const availableValues = bars.flatMap((bar) => [bar.start, bar.end]);
+  const availableValues = bars.map((bar) => bar.value);
   const min = Math.min(0, ...availableValues);
   const max = Math.max(0, ...availableValues);
   const span = Math.max(max - min, 1);
@@ -1018,41 +895,18 @@ function drawWaterfallChart() {
   ctx.strokeStyle = "rgba(224, 205, 165, .28)";
   ctx.stroke();
 
-  if (!canReconcile) {
-    ctx.fillStyle = "#9b998f";
-    ctx.font = '600 12px "Noto Sans JP"';
-    ctx.textAlign = "center";
-    ctx.fillText("期首・期末現金残高の開示がないため、増減のみを表示しています。", width / 2, padding.top + 18);
-  }
-
   bars.forEach((bar, index) => {
     const x = padding.left + gap * index + gap / 2;
-    const startY = scaleY(bar.start);
-    const endY = scaleY(bar.end);
-    const top = bar.total ? endY : Math.min(startY, endY);
-    const bottom = bar.total ? zeroY : Math.max(startY, endY);
+    const valueY = scaleY(bar.value);
+    ctx.fillStyle = bar.value >= 0 ? "#82ba8e" : "#d8867f";
+    ctx.fillRect(x - barWidth / 2, Math.min(valueY, zeroY), barWidth, Math.max(3, Math.abs(zeroY - valueY)));
 
-    if (index > 0) {
-      const previousBar = bars[index - 1];
-      const previousX = padding.left + gap * (index - 1) + gap / 2;
-      ctx.beginPath();
-      ctx.moveTo(previousX + barWidth / 2, scaleY(previousBar.end));
-      ctx.lineTo(x - barWidth / 2, scaleY(bar.start));
-      ctx.strokeStyle = "rgba(224, 205, 165, .38)";
-      ctx.setLineDash([3, 3]);
-      ctx.stroke();
-      ctx.setLineDash([]);
-    }
-
-    ctx.fillStyle = bar.total ? "rgba(214, 183, 122, .68)" : bar.value >= 0 ? "#82ba8e" : "#d8867f";
-    ctx.fillRect(x - barWidth / 2, Math.min(top, bottom), barWidth, Math.max(3, Math.abs(bottom - top)));
-
-    ctx.fillStyle = bar.total ? "#d6b77a" : bar.value >= 0 ? "#82ba8e" : "#d8867f";
+    ctx.fillStyle = bar.value >= 0 ? "#82ba8e" : "#d8867f";
     ctx.font = compactLabels ? '700 9px "Manrope"' : '700 10px "Manrope"';
     ctx.textAlign = "center";
-    const valueLabel = `${bar.value >= 0 && !bar.total ? "+" : ""}${formatCompactYen(bar.value)}`;
+    const valueLabel = `${bar.value >= 0 ? "+" : ""}${formatCompactYen(bar.value)}`;
     const labelOffset = compactLabels && index % 2 ? 25 : 14;
-    const preferredY = endY + (bar.value < 0 && !bar.total ? labelOffset : -labelOffset);
+    const preferredY = valueY + (bar.value < 0 ? labelOffset : -labelOffset);
     const minLabelY = padding.top + 10;
     const maxLabelY = padding.top + chartHeight - 8;
     const labelY = Math.min(Math.max(preferredY, minLabelY), maxLabelY);
@@ -1067,27 +921,14 @@ function drawWaterfallChart() {
   });
 }
 
-function calculateProfitCashAdjustment(analysis) {
-  if (analysis.previousCashAndCashEquivalents === null || analysis.cashAndCashEquivalents === null) return null;
-  const disclosedChanges = [
-    analysis.currentRevenue,
-    -analysis.currentOperatingCost,
-    analysis.investingCashFlow,
-    analysis.financingCashFlow,
-  ]
-    .filter((value) => value !== null)
-    .reduce((total, value) => total + value, 0);
-  return analysis.cashAndCashEquivalents - analysis.previousCashAndCashEquivalents - disclosedChanges;
-}
-
 /**
- * 概要: 年間の利益とキャッシュフローの説明パネルを更新します。
+ * 概要: 選択中の四半期の業績内訳パネルを更新します。
  * 引数: なし。
  * 戻り値: なし。
  */
 function renderAnnualFlow() {
-  const analysis = activeAnnualAnalysis();
-  if (!analysis) {
+  const result = activeResult();
+  if (!result) {
     const year = activeResult()?.fiscalYear;
     elements.flowPeriod.textContent = year ? `FY${year}` : "PENDING";
     [
@@ -1103,14 +944,18 @@ function renderAnnualFlow() {
     });
     return;
   }
-  elements.flowPeriod.textContent = analysis.currentFiscalYear;
-  elements.previousCashAndCashEquivalents.textContent = formatOptionalBillions(analysis.previousCashAndCashEquivalents);
-  elements.annualRevenue.textContent = formatOptionalBillions(analysis.currentRevenue);
-  elements.annualOperatingCost.textContent = formatOptionalBillions(-analysis.currentOperatingCost);
-  elements.investmentCashFlow.textContent = formatOptionalBillions(analysis.investingCashFlow);
-  elements.financingCashFlow.textContent = formatOptionalBillions(analysis.financingCashFlow);
-  elements.otherCashFlowAdjustment.textContent = formatOptionalBillions(calculateProfitCashAdjustment(analysis));
-  elements.cashAndCashEquivalents.textContent = formatOptionalBillions(analysis.cashAndCashEquivalents);
+  const profit = profitValue(result);
+  const margin = profit === null ? null : (profit / result.revenue) * 100;
+  elements.flowPeriod.textContent = chartPeriodLabel(result);
+  elements.previousCashAndCashEquivalents.textContent = `${result.fiscalYear}年度 第${result.quarter}四半期`;
+  elements.annualRevenue.textContent = formatOptionalBillions(result.revenue);
+  elements.annualOperatingCost.textContent = formatOptionalBillions(
+    result.operatingCost === null ? null : -result.operatingCost,
+  );
+  elements.investmentCashFlow.textContent = formatOptionalBillions(profit);
+  elements.financingCashFlow.textContent = formatOptionalBillions(result.netIncome);
+  elements.otherCashFlowAdjustment.textContent = margin === null ? "開示なし" : `${margin.toFixed(1)}%`;
+  elements.cashAndCashEquivalents.textContent = result.sourceUrl ? "PDF登録あり" : "未登録";
 }
 
 function renderCharts() {

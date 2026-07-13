@@ -83,7 +83,7 @@
             <p class="eyebrow" id="company-name">TOYOTA MOTOR CORPORATION</p>
             <h2>Financial Overview</h2>
             <p class="hero-description">
-              公式IR資料をもとにした業績推移と、公式PDF・株価データをまとめて確認できます。
+              公式IR資料をもとにした四半期ごとの業績推移と、公式PDFをまとめて確認できます。
             </p>
           </div>
           <div class="period-picker">
@@ -94,9 +94,9 @@
               </div>
             </div>
             <div class="period-field quarter-field">
-              <label for="quarter-select">提出期間</label>
+              <label for="quarter-select">四半期</label>
               <div class="select-wrap">
-                <select id="quarter-select" aria-label="対象提出期間"></select>
+                <select id="quarter-select" aria-label="対象四半期"></select>
               </div>
             </div>
             <small id="period-caption">決算期間 —</small>
@@ -154,7 +154,7 @@
           <article class="panel performance-panel">
             <div class="panel-heading">
               <div>
-                <p class="eyebrow">HALF-YEAR / FULL-YEAR TREND</p>
+                <p class="eyebrow">QUARTERLY TREND</p>
                 <h3>Revenue &amp; Profit</h3>
               </div>
               <div class="legend">
@@ -187,13 +187,13 @@
         <section class="panel annual-flow-panel year-data" id="annual-flow">
           <div class="panel-heading">
             <div>
-              <p class="eyebrow">CASH FLOW BREAKDOWN</p>
-              <h3>How Cash Moved</h3>
+              <p class="eyebrow">QUARTER BREAKDOWN</p>
+              <h3>Quarterly Result Breakdown</h3>
             </div>
             <span class="flow-period" id="flow-period">—</span>
           </div>
           <p class="panel-description">
-            前期末現金に売上収益と主な支出を反映し、今期末現金までの変化を表示します。
+            選択中の四半期について、売上収益・費用・利益・純利益を並べて表示します。
           </p>
           <div class="flow-layout">
             <div class="waterfall-wrap">
@@ -201,7 +201,7 @@
             </div>
             <aside class="flow-summary">
               <div class="investment-card">
-                <small>前期末現金</small>
+                <small>対象四半期</small>
                 <strong id="previous-cash-and-cash-equivalents">—</strong>
               </div>
               <div class="investment-card">
@@ -213,25 +213,25 @@
                 <strong id="annual-operating-cost">—</strong>
               </div>
               <div class="investment-card">
-                <small>投資活動</small>
+                <small>営業利益</small>
                 <strong id="investment-cash-flow">—</strong>
               </div>
               <div class="investment-card">
-                <small>財務活動</small>
+                <small>純利益</small>
                 <strong id="financing-cash-flow">—</strong>
               </div>
               <div class="investment-card">
-                <small>その他調整</small>
+                <small>利益率</small>
                 <strong id="other-cash-flow-adjustment">—</strong>
               </div>
               <div class="investment-card">
-                <small>今期末現金</small>
+                <small>資料</small>
                 <strong id="cash-and-cash-equivalents">—</strong>
               </div>
             </aside>
           </div>
           <p class="flow-note">
-            売上収益と費用は会計上の計上額です。税金、非現金項目、運転資本の増減、為替影響などは「その他調整」にまとめています。
+            ここでは四半期の損益項目を表示します。営業キャッシュフローそのものは登録済みデータに含めていません。
           </p>
         </section>
 
