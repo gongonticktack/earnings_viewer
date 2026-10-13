@@ -1,3 +1,5 @@
+🌐 **Webアプリ：[Earnings Atelierを開く](https://earningsviewer.gongonticktack.workers.dev/)**
+
 # Earnings Atelier（earnings_viewer）
 
 ## 概要
