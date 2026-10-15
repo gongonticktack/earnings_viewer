@@ -1,0 +1,15 @@
+{
+  "name": "earnings-atelier",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node build-pdf-reader.mjs",
+    "sync:statements": "node sync-statements.mjs",
+    "sync:history": "node sync-statements.mjs --history",
+    "test": "node --test *.test.mjs",
+    "check": "node --check app.js && node --check stock-indicators.js && node --check chart-interaction.js && node --check i18n.js && node --check worker.js && node --check market.js && node --check sankey.js && node --check financial-reports.js && node --check report-metadata.js && node --check build-pdf-reader.mjs && node --check sync-statements.mjs && node --check company-requests.js && node --check cash-flow.js"
+  },
+  "dependencies": {
+    "pdfjs-dist": "^6.4.299"
+  }
+}

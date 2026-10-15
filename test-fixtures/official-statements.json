@@ -1,0 +1,860 @@
+[
+  {
+    "fiscalYear": 2026,
+    "quarter": 1,
+    "periodStart": "2026-04-01",
+    "periodEnd": "2026-06-30",
+    "basis": "quarter",
+    "months": 3,
+    "companyCode": "toyota",
+    "revenue": 13525400,
+    "operatingIncome": 1063473,
+    "pretaxIncome": 1963862,
+    "netIncome": 1477044,
+    "operatingCost": 12461927,
+    "statementRows": [
+      {
+        "label": "商品・製品売上収益",
+        "value": 12142263,
+        "page": 10,
+        "group": null
+      },
+      {
+        "label": "金融事業に係る金融収益",
+        "value": 1383137,
+        "page": 10,
+        "group": null
+      },
+      {
+        "label": "営業収益合計",
+        "value": 13525400,
+        "page": 10,
+        "group": null
+      },
+      {
+        "label": "売上原価",
+        "value": 10185856,
+        "page": 10,
+        "group": null
+      },
+      {
+        "label": "金融事業に係る金融費用",
+        "value": 901297,
+        "page": 10,
+        "group": null
+      },
+      {
+        "label": "販売費及び一般管理費",
+        "value": 1374774,
+        "page": 10,
+        "group": null
+      },
+      {
+        "label": "営業利益",
+        "value": 1063473,
+        "page": 10,
+        "group": null
+      },
+      {
+        "label": "持分法による投資損益",
+        "value": 210685,
+        "page": 10,
+        "group": null
+      },
+      {
+        "label": "その他の金融収益",
+        "value": 850594,
+        "page": 10,
+        "group": null
+      },
+      {
+        "label": "その他の金融費用",
+        "value": -285617,
+        "page": 10,
+        "group": null
+      },
+      {
+        "label": "為替差損益<純額>",
+        "value": 112378,
+        "page": 10,
+        "group": null
+      },
+      {
+        "label": "その他<純額>",
+        "value": 12348,
+        "page": 10,
+        "group": null
+      },
+      {
+        "label": "税引前四半期利益",
+        "value": 1963862,
+        "page": 10,
+        "group": null
+      },
+      {
+        "label": "法人所得税費用",
+        "value": 412136,
+        "page": 10,
+        "group": null
+      },
+      {
+        "label": "四半期利益",
+        "value": 1551725,
+        "page": 10,
+        "group": null
+      },
+      {
+        "label": "親会社の所有者",
+        "value": 1477044,
+        "page": 10,
+        "group": null
+      },
+      {
+        "label": "非支配持分",
+        "value": 74681,
+        "page": 10,
+        "group": null
+      },
+      {
+        "label": "四半期利益",
+        "value": 1551725,
+        "page": 10,
+        "group": null
+      }
+    ],
+    "signedExpenses": false,
+    "operatingCostLabel": "売上収益−営業利益（差額）",
+    "sourceName": "公式決算書",
+    "sourceUrl": "https://global.toyota/pages/global_toyota/ir/financial-results/2027_1q_summary_jp.pdf",
+    "sourcePages": [
+      10
+    ],
+    "sourceUrls": [
+      "https://global.toyota/pages/global_toyota/ir/financial-results/2027_1q_summary_jp.pdf"
+    ],
+    "updatedAt": "2026-10-13T13:56:17.215Z"
+  },
+  {
+    "fiscalYear": 2026,
+    "quarter": 1,
+    "periodStart": "2026-04-01",
+    "periodEnd": "2026-06-30",
+    "basis": "quarter",
+    "months": 3,
+    "companyCode": "kioxia",
+    "revenue": 1767117,
+    "operatingIncome": 1270017,
+    "pretaxIncome": 1234720,
+    "netIncome": 842165,
+    "operatingCost": 497100,
+    "statementRows": [
+      {
+        "label": "売上収益",
+        "value": 1767117,
+        "page": 12,
+        "group": null
+      },
+      {
+        "label": "売上原価",
+        "value": 387051,
+        "page": 12,
+        "group": null
+      },
+      {
+        "label": "売上総利益",
+        "value": 1380066,
+        "page": 12,
+        "group": null
+      },
+      {
+        "label": "販売費及び一般管理費",
+        "value": 71727,
+        "page": 12,
+        "group": null
+      },
+      {
+        "label": "その他の収益",
+        "value": 530,
+        "page": 12,
+        "group": null
+      },
+      {
+        "label": "その他の費用",
+        "value": 38852,
+        "page": 12,
+        "group": null
+      },
+      {
+        "label": "営業利益",
+        "value": 1270017,
+        "page": 12,
+        "group": null
+      },
+      {
+        "label": "金融収益",
+        "value": 17170,
+        "page": 12,
+        "group": null
+      },
+      {
+        "label": "金融費用",
+        "value": 52801,
+        "page": 12,
+        "group": null
+      },
+      {
+        "label": "持分法による投資利益(△損失)",
+        "value": 334,
+        "page": 12,
+        "group": null
+      },
+      {
+        "label": "税引前四半期利益",
+        "value": 1234720,
+        "page": 12,
+        "group": null
+      },
+      {
+        "label": "法人所得税費用",
+        "value": 392549,
+        "page": 12,
+        "group": null
+      },
+      {
+        "label": "四半期利益",
+        "value": 842171,
+        "page": 12,
+        "group": null
+      },
+      {
+        "label": "親会社の所有者",
+        "value": 842165,
+        "page": 12,
+        "group": null
+      },
+      {
+        "label": "非支配持分",
+        "value": 6,
+        "page": 12,
+        "group": null
+      },
+      {
+        "label": "四半期利益",
+        "value": 842171,
+        "page": 12,
+        "group": null
+      }
+    ],
+    "signedExpenses": false,
+    "operatingCostLabel": "売上収益−営業利益（差額）",
+    "sourceName": "公式決算書",
+    "sourceUrl": "https://ssl4.eir-parts.net/doc/285A/tdnet/2859905/00.pdf",
+    "sourcePages": [
+      12
+    ],
+    "sourceUrls": [
+      "https://ssl4.eir-parts.net/doc/285A/tdnet/2859905/00.pdf"
+    ],
+    "updatedAt": "2026-10-13T13:56:17.185Z"
+  },
+  {
+    "fiscalYear": 2026,
+    "quarter": 1,
+    "periodStart": "2026-04-01",
+    "periodEnd": "2026-06-30",
+    "basis": "quarter",
+    "months": 3,
+    "companyCode": "tokyo-electron",
+    "revenue": 732388,
+    "operatingIncome": 211407,
+    "pretaxIncome": 215495,
+    "netIncome": 164341,
+    "operatingCost": 520981,
+    "statementRows": [
+      {
+        "label": "売上高",
+        "value": 732388,
+        "page": 9,
+        "group": null
+      },
+      {
+        "label": "売上原価",
+        "value": 389676,
+        "page": 9,
+        "group": null
+      },
+      {
+        "label": "売上総利益",
+        "value": 342712,
+        "page": 9,
+        "group": null
+      },
+      {
+        "label": "研究開発費",
+        "value": 72046,
+        "page": 9,
+        "group": "販売費及び一般管理費"
+      },
+      {
+        "label": "その他",
+        "value": 59257,
+        "page": 9,
+        "group": "販売費及び一般管理費"
+      },
+      {
+        "label": "販売費及び一般管理費合計",
+        "value": 131304,
+        "page": 9,
+        "group": "販売費及び一般管理費"
+      },
+      {
+        "label": "営業利益",
+        "value": 211407,
+        "page": 9,
+        "group": null
+      },
+      {
+        "label": "受取配当金",
+        "value": 1158,
+        "page": 9,
+        "group": "営業外収益"
+      },
+      {
+        "label": "補助金収入",
+        "value": 1952,
+        "page": 9,
+        "group": "営業外収益"
+      },
+      {
+        "label": "その他",
+        "value": 1836,
+        "page": 9,
+        "group": "営業外収益"
+      },
+      {
+        "label": "営業外収益合計",
+        "value": 4947,
+        "page": 9,
+        "group": "営業外収益"
+      },
+      {
+        "label": "為替差損",
+        "value": 504,
+        "page": 9,
+        "group": "営業外費用"
+      },
+      {
+        "label": "その他",
+        "value": 224,
+        "page": 9,
+        "group": "営業外費用"
+      },
+      {
+        "label": "営業外費用合計",
+        "value": 728,
+        "page": 9,
+        "group": "営業外費用"
+      },
+      {
+        "label": "経常利益",
+        "value": 215626,
+        "page": 9,
+        "group": null
+      },
+      {
+        "label": "固定資産売却益",
+        "value": 15,
+        "page": 9,
+        "group": "特別利益"
+      },
+      {
+        "label": "特別利益合計",
+        "value": 15,
+        "page": 9,
+        "group": "特別利益"
+      },
+      {
+        "label": "固定資産除売却損",
+        "value": 145,
+        "page": 9,
+        "group": "特別損失"
+      },
+      {
+        "label": "特別損失合計",
+        "value": 145,
+        "page": 9,
+        "group": "特別損失"
+      },
+      {
+        "label": "税金等調整前四半期純利益",
+        "value": 215495,
+        "page": 9,
+        "group": null
+      },
+      {
+        "label": "法人税等",
+        "value": 51153,
+        "page": 9,
+        "group": null
+      },
+      {
+        "label": "四半期純利益",
+        "value": 164341,
+        "page": 9,
+        "group": null
+      },
+      {
+        "label": "親会社株主に帰属する四半期純利益",
+        "value": 164341,
+        "page": 9,
+        "group": null
+      }
+    ],
+    "signedExpenses": false,
+    "operatingCostLabel": "売上収益−営業利益（差額）",
+    "sourceName": "公式決算書",
+    "sourceUrl": "https://www.tel.co.jp/ir/library/report/negqvb0000000eqw-att/fy27q1tanshin-j.pdf",
+    "sourcePages": [
+      9
+    ],
+    "sourceUrls": [
+      "https://www.tel.co.jp/ir/library/report/negqvb0000000eqw-att/fy27q1tanshin-j.pdf"
+    ],
+    "updatedAt": "2026-10-13T13:56:17.155Z"
+  },
+  {
+    "fiscalYear": 2026,
+    "quarter": 1,
+    "periodStart": "2026-04-01",
+    "periodEnd": "2026-06-30",
+    "basis": "quarter",
+    "months": 3,
+    "companyCode": "itochu",
+    "revenue": 3875861,
+    "operatingIncome": null,
+    "pretaxIncome": 369999,
+    "netIncome": 293763,
+    "operatingCost": 3505862,
+    "statementRows": [
+      {
+        "label": "商品販売等に係る収益",
+        "value": 3483127,
+        "page": 8,
+        "group": "収益"
+      },
+      {
+        "label": "役務提供及びロイヤルティ取引に係る収益",
+        "value": 392734,
+        "page": 8,
+        "group": "収益"
+      },
+      {
+        "label": "収益合計",
+        "value": 3875861,
+        "page": 8,
+        "group": "収益"
+      },
+      {
+        "label": "商品販売等に係る原価",
+        "value": -3022515,
+        "page": 8,
+        "group": "原価"
+      },
+      {
+        "label": "役務提供及びロイヤルティ取引に係る原価",
+        "value": -197360,
+        "page": 8,
+        "group": "原価"
+      },
+      {
+        "label": "原価合計",
+        "value": -3219875,
+        "page": 8,
+        "group": "原価"
+      },
+      {
+        "label": "売上総利益",
+        "value": 655986,
+        "page": 8,
+        "group": null
+      },
+      {
+        "label": "販売費及び一般管理費",
+        "value": -446880,
+        "page": 8,
+        "group": null
+      },
+      {
+        "label": "貸倒損失",
+        "value": -3651,
+        "page": 8,
+        "group": null
+      },
+      {
+        "label": "有価証券損益",
+        "value": 38144,
+        "page": 8,
+        "group": null
+      },
+      {
+        "label": "固定資産に係る損益",
+        "value": 2334,
+        "page": 8,
+        "group": null
+      },
+      {
+        "label": "その他の損益",
+        "value": 9151,
+        "page": 8,
+        "group": null
+      },
+      {
+        "label": "その他の収益及び費用合計",
+        "value": -400902,
+        "page": 8,
+        "group": null
+      },
+      {
+        "label": "受取利息",
+        "value": 13348,
+        "page": 8,
+        "group": null
+      },
+      {
+        "label": "受取配当金",
+        "value": 17720,
+        "page": 8,
+        "group": null
+      },
+      {
+        "label": "支払利息",
+        "value": -27777,
+        "page": 8,
+        "group": null
+      },
+      {
+        "label": "金融収益及び金融費用合計",
+        "value": 3291,
+        "page": 8,
+        "group": null
+      },
+      {
+        "label": "持分法による投資損益",
+        "value": 111624,
+        "page": 8,
+        "group": null
+      },
+      {
+        "label": "税引前四半期利益",
+        "value": 369999,
+        "page": 8,
+        "group": null
+      },
+      {
+        "label": "法人所得税費用",
+        "value": -66349,
+        "page": 8,
+        "group": null
+      },
+      {
+        "label": "四半期純利益:",
+        "value": 303650,
+        "page": 8,
+        "group": null
+      },
+      {
+        "label": "当社株主に帰属する四半期純利益",
+        "value": 293763,
+        "page": 8,
+        "group": null
+      },
+      {
+        "label": "非支配持分に帰属する四半期純利益",
+        "value": 9887,
+        "page": 8,
+        "group": null
+      }
+    ],
+    "signedExpenses": true,
+    "operatingCostLabel": "収益−税引前利益（差額）",
+    "sourceName": "公式決算書",
+    "sourceUrl": "https://www.itochu.co.jp/ja/ir/financial_statements/2027/__icsFiles/afieldfile/2026/08/06/27_1st_01_2.pdf",
+    "sourcePages": [
+      8
+    ],
+    "sourceUrls": [
+      "https://www.itochu.co.jp/ja/ir/financial_statements/2027/__icsFiles/afieldfile/2026/08/06/27_1st_01_2.pdf"
+    ],
+    "updatedAt": "2026-10-13T13:56:22.761Z"
+  },
+  {
+    "fiscalYear": 2026,
+    "quarter": 1,
+    "periodStart": "2026-04-01",
+    "periodEnd": "2026-06-30",
+    "basis": "quarter",
+    "months": 3,
+    "companyCode": "softbank-group",
+    "revenue": 2019591,
+    "operatingIncome": null,
+    "pretaxIncome": 589150,
+    "netIncome": 347330,
+    "operatingCost": 1430441,
+    "statementRows": [
+      {
+        "label": "売上高",
+        "value": 2019591,
+        "page": 35,
+        "group": null
+      },
+      {
+        "label": "売上原価",
+        "value": -965957,
+        "page": 35,
+        "group": null
+      },
+      {
+        "label": "売上総利益",
+        "value": 1053634,
+        "page": 35,
+        "group": null
+      },
+      {
+        "label": "持株会社投資事業",
+        "value": 1382212,
+        "page": 35,
+        "group": "投資損益"
+      },
+      {
+        "label": "SVF事業",
+        "value": 460061,
+        "page": 35,
+        "group": "投資損益"
+      },
+      {
+        "label": "その他",
+        "value": 17109,
+        "page": 35,
+        "group": "投資損益"
+      },
+      {
+        "label": "投資損益合計",
+        "value": 1859382,
+        "page": 35,
+        "group": "投資損益"
+      },
+      {
+        "label": "販売費及び一般管理費",
+        "value": -1286924,
+        "page": 35,
+        "group": null
+      },
+      {
+        "label": "財務費用",
+        "value": -328745,
+        "page": 35,
+        "group": null
+      },
+      {
+        "label": "為替差損益",
+        "value": -146065,
+        "page": 35,
+        "group": null
+      },
+      {
+        "label": "デリバティブ関連損益(投資損益を除く)",
+        "value": -391585,
+        "page": 35,
+        "group": null
+      },
+      {
+        "label": "SVFの外部投資家持分の増減額",
+        "value": -176641,
+        "page": 35,
+        "group": null
+      },
+      {
+        "label": "その他の損益",
+        "value": 6094,
+        "page": 35,
+        "group": null
+      },
+      {
+        "label": "税引前利益",
+        "value": 589150,
+        "page": 35,
+        "group": null
+      },
+      {
+        "label": "法人所得税",
+        "value": -70163,
+        "page": 35,
+        "group": null
+      },
+      {
+        "label": "純利益",
+        "value": 518987,
+        "page": 35,
+        "group": null
+      },
+      {
+        "label": "親会社の所有者",
+        "value": 347330,
+        "page": 35,
+        "group": null
+      },
+      {
+        "label": "非支配持分",
+        "value": 171657,
+        "page": 35,
+        "group": null
+      },
+      {
+        "label": "純利益",
+        "value": 518987,
+        "page": 35,
+        "group": null
+      }
+    ],
+    "signedExpenses": true,
+    "operatingCostLabel": "収益−税引前利益（差額）",
+    "sourceName": "公式決算書",
+    "sourceUrl": "https://group.softbank/media/Project/sbg/sbg/pdf/ir/financials/financial_reports/financial-report_q1fy2026_01_ja.pdf",
+    "sourcePages": [
+      35
+    ],
+    "sourceUrls": [
+      "https://group.softbank/media/Project/sbg/sbg/pdf/ir/financials/financial_reports/financial-report_q1fy2026_01_ja.pdf"
+    ],
+    "updatedAt": "2026-10-13T13:56:21.713Z"
+  },
+  {
+    "fiscalYear": 2026,
+    "quarter": 1,
+    "periodStart": "2026-04-01",
+    "periodEnd": "2026-06-30",
+    "basis": "quarter",
+    "months": 3,
+    "companyCode": "hitachi",
+    "revenue": 2709586,
+    "operatingIncome": null,
+    "pretaxIncome": 295109,
+    "netIncome": 189450,
+    "operatingCost": 2414477,
+    "statementRows": [
+      {
+        "label": "売上収益",
+        "value": 2709586,
+        "page": 4,
+        "group": null
+      },
+      {
+        "label": "売上原価",
+        "value": -1899913,
+        "page": 4,
+        "group": null
+      },
+      {
+        "label": "売上総利益",
+        "value": 809673,
+        "page": 4,
+        "group": null
+      },
+      {
+        "label": "販売費及び一般管理費",
+        "value": -515386,
+        "page": 4,
+        "group": null
+      },
+      {
+        "label": "調整後営業利益",
+        "value": 294287,
+        "page": 4,
+        "group": null
+      },
+      {
+        "label": "その他の収益",
+        "value": 2309,
+        "page": 4,
+        "group": null
+      },
+      {
+        "label": "その他の費用",
+        "value": -13416,
+        "page": 4,
+        "group": null
+      },
+      {
+        "label": "金融収益",
+        "value": 8643,
+        "page": 4,
+        "group": null
+      },
+      {
+        "label": "金融費用",
+        "value": -581,
+        "page": 4,
+        "group": null
+      },
+      {
+        "label": "持分法による投資損益",
+        "value": 2874,
+        "page": 4,
+        "group": null
+      },
+      {
+        "label": "受取利息",
+        "value": 7422,
+        "page": 4,
+        "group": null
+      },
+      {
+        "label": "支払利息",
+        "value": -6429,
+        "page": 4,
+        "group": null
+      },
+      {
+        "label": "税引前四半期利益",
+        "value": 295109,
+        "page": 4,
+        "group": null
+      },
+      {
+        "label": "法人所得税費用",
+        "value": -91963,
+        "page": 4,
+        "group": null
+      },
+      {
+        "label": "四半期利益",
+        "value": 203146,
+        "page": 4,
+        "group": null
+      },
+      {
+        "label": "親会社株主持分",
+        "value": 189450,
+        "page": 4,
+        "group": null
+      },
+      {
+        "label": "非支配持分",
+        "value": 13696,
+        "page": 4,
+        "group": null
+      }
+    ],
+    "signedExpenses": true,
+    "operatingCostLabel": "収益−税引前利益（差額）",
+    "sourceName": "公式決算書",
+    "sourceUrl": "https://www.hitachi.com/content/dam/hitachi/global/ja_jp/press/files/2026/07/0729/2026_1Q.pdf",
+    "sourcePages": [
+      4
+    ],
+    "sourceUrls": [
+      "https://www.hitachi.com/content/dam/hitachi/global/ja_jp/press/files/2026/07/0729/2026_1Q.pdf"
+    ],
+    "updatedAt": "2026-10-13T13:56:22.148Z"
+  }
+]

@@ -50,6 +50,7 @@
           <button class="company-button" data-company="shin-etsu" type="button"><span class="company-rank">18</span><span><strong>SHIN-ETSU CHEMICAL</strong><small>4063</small></span></button>
           <button class="company-button" data-company="ntt" type="button"><span class="company-rank">19</span><span><strong>NTT</strong><small>9432</small></span></button>
           <button class="company-button" data-company="mitsui" type="button"><span class="company-rank">20</span><span><strong>MITSUI &amp; CO.</strong><small>8031</small></span></button>
+          <button class="company-request-button" id="company-request-open" type="button"><span aria-hidden="true">＋</span> <span data-language>企業の追加希望</span></button>
         </section>
 
         <div class="sidebar-bottom">
@@ -68,22 +69,49 @@
           <div>
             <p class="eyebrow">FINANCIAL INTELLIGENCE</p>
             <h1>Quarterly Performance</h1>
+            <span class="latest-update" id="latest-update">登録業績更新 —</span>
           </div>
           <div class="topbar-actions">
-            <span class="latest-update" id="latest-update">Last updated —</span>
             <button class="refresh-button" id="refresh-button" type="button">
               <span class="refresh-icon">↻</span>
               <span id="refresh-button-label">更新</span>
             </button>
+            <button class="refresh-button language-button" id="language-toggle" type="button" aria-label="Switch to English">English</button>
           </div>
         </header>
+
+        <section class="panel live-market" aria-label="最新株価">
+          <div>
+            <p class="eyebrow">LATEST STOCK PRICE</p>
+            <strong class="live-price" id="live-price">—</strong>
+            <span class="live-change" id="live-change">—</span>
+          </div>
+          <div class="live-market-meta">
+            <label><input id="auto-refresh" type="checkbox" checked /> <span data-language>自動更新</span></label>
+            <p id="quote-status" role="status">最新株価を取得しています</p>
+            <small>株価は1時間・決算情報は1日ごとに確認 / 配信元による遅延あり</small>
+          </div>
+        </section>
+        <section class="panel live-financial" aria-label="配信元の最新通期業績">
+          <div>
+            <p class="eyebrow">LATEST ANNUAL RESULTS</p>
+            <strong id="annual-summary-period">通期業績を取得しています</strong>
+            <p class="panel-description" id="annual-summary-source">配信元の通期実績。下の四半期業績とは期間が異なります</p>
+          </div>
+          <div class="annual-summary-values">
+            <div><small>売上収益</small><strong id="annual-summary-revenue">—</strong></div>
+            <div><small id="annual-summary-profit-label">営業利益</small><strong id="annual-summary-profit">—</strong></div>
+            <div><small>純利益</small><strong id="annual-summary-net">—</strong></div>
+          </div>
+        </section>
+        <p class="data-status" id="data-status" role="status">業績の出典を確認しています</p>
 
         <section class="hero-panel" id="overview">
           <div>
             <p class="eyebrow" id="company-name">TOYOTA MOTOR CORPORATION</p>
             <h2>Financial Overview</h2>
             <p class="hero-description">
-              公式IR資料をもとにした四半期ごとの業績推移と、公式PDFをまとめて確認できます。
+              公表済みの公式決算書から収入・支出の内訳を取得。最新株価と四半期業績をまとめて確認できます。
             </p>
           </div>
           <div class="period-picker">
@@ -158,13 +186,14 @@
                 <h3>Revenue &amp; Profit</h3>
               </div>
               <div class="legend">
-                <span><i class="legend-bar"></i> Revenue</span>
+                <span><i class="legend-bar"></i> <span data-language>Revenue</span></span>
                 <span><i class="legend-line"></i> <span id="profit-chart-label">Operating Income</span></span>
               </div>
             </div>
             <div class="chart-container">
               <canvas id="performance-chart"></canvas>
             </div>
+            <p class="chart-hint" data-language>クリック・タップで数値を表示</p>
           </article>
 
           <article class="panel margin-panel">
@@ -181,6 +210,7 @@
             <div class="chart-container mini">
               <canvas id="margin-chart"></canvas>
             </div>
+            <p class="chart-hint" data-language>クリック・タップで数値を表示</p>
           </article>
         </section>
 
@@ -188,68 +218,91 @@
           <div class="panel-heading">
             <div>
               <p class="eyebrow">QUARTER BREAKDOWN</p>
-              <h3>Quarterly Result Breakdown</h3>
+              <h3 id="flow-title">収入と支出のサンキーグラフ</h3>
             </div>
             <span class="flow-period" id="flow-period">—</span>
+            <button class="refresh-button sankey-zoom-button" id="sankey-zoom" type="button" aria-controls="sankey-chart" aria-pressed="false">拡大表示</button>
           </div>
-          <p class="panel-description">
-            選択中の四半期について、売上収益・費用・利益・純利益を並べて表示します。
+          <div class="flow-mode-control"><label for="flow-mode" data-language>表示内容</label>
+            <select id="flow-mode"><option value="income" data-language>収入・支出</option><option value="cash" data-language>キャッシュフロー</option></select>
+          </div>
+          <p class="panel-description" id="flow-description">
+            売上収益が費用・税金等・純利益へ配分される流れを表示します。帯の太さは金額に比例します。
           </p>
+          <p class="chart-hint" data-language>クリック・タップで数値を表示</p>
           <div class="flow-layout">
-            <div class="waterfall-wrap">
-              <canvas id="waterfall-chart"></canvas>
+            <div class="sankey-wrap" tabindex="0" role="region" aria-label="収入・支出の図。拡大表示では左右にスクロールできます。">
+              <canvas id="sankey-chart" role="img" aria-label="収入・支出のサンキーグラフ"></canvas>
             </div>
             <aside class="flow-summary">
               <div class="investment-card">
-                <small>対象四半期</small>
+                <small id="flow-caption-0">配分総額</small>
                 <strong id="previous-cash-and-cash-equivalents">—</strong>
               </div>
               <div class="investment-card">
-                <small>売上収益</small>
+                <small id="flow-caption-1">売上収益</small>
                 <strong id="annual-revenue">—</strong>
               </div>
               <div class="investment-card">
-                <small>原価・人件費など</small>
+                <small id="flow-cost-caption">営業費用・費用等</small>
                 <strong id="annual-operating-cost">—</strong>
               </div>
               <div class="investment-card">
-                <small>営業利益</small>
+                <small id="flow-caption-3">費用差引後</small>
                 <strong id="investment-cash-flow">—</strong>
               </div>
               <div class="investment-card">
-                <small>純利益</small>
+                <small id="flow-caption-4">税金・その他</small>
                 <strong id="financing-cash-flow">—</strong>
               </div>
               <div class="investment-card">
-                <small>利益率</small>
+                <small id="flow-caption-5">利益率</small>
                 <strong id="other-cash-flow-adjustment">—</strong>
               </div>
               <div class="investment-card">
-                <small>資料</small>
+                <small id="flow-caption-6">純利益</small>
                 <strong id="cash-and-cash-equivalents">—</strong>
               </div>
             </aside>
           </div>
-          <p class="flow-note">
-            ここでは四半期の損益項目を表示します。営業キャッシュフローそのものは登録済みデータに含めていません。
+          <p class="sankey-help" data-language>拡大表示では図を左右にスワイプできます。科目の全文と金額は下の内訳表でも確認できます。</p>
+          <p class="flow-note" id="flow-note">
+            この図は損益のつながりを示します。増益となる税金・その他は左側の流入、純損失は不足額として表示します。
           </p>
+          <div class="statement-heading">
+            <h4 id="statement-title">決算書の収入・支出内訳</h4>
+            <select id="statement-select" aria-label="内訳を確認する決算書"></select>
+            <label><input type="checkbox" id="cumulative-flow" /> <span data-language>この決算書の期間をサンキーに表示</span></label>
+          </div>
+          <p class="data-status" id="statement-status" role="status">公式決算書を確認しています</p>
+          <div class="table-wrap statement-table">
+            <table>
+              <thead><tr><th>決算書の科目</th><th>金額 / 百万円</th><th>原本</th></tr></thead>
+              <tbody id="statement-body"></tbody>
+            </table>
+          </div>
         </section>
 
         <section class="panel stock-chart-panel" id="stock-price">
           <div class="panel-heading">
             <div>
               <p class="eyebrow">MARKET PERFORMANCE</p>
-              <h3>Weekly Stock Price</h3>
+              <h3>Daily Stock Price</h3>
             </div>
-            <span class="flow-period">WEEKLY</span>
+            <span class="flow-period" data-language>DAILY</span>
           </div>
           <p class="panel-description">
-            選択した企業の直近1年間の週足を、始値・高値・安値・終値で表示します。
+            直近1年の日足に、終値の5・25・100営業日MAと、最高値・最低値からのフィボナッチを表示します。
           </p>
+          <div class="stock-indicator-legend" aria-label="指標の凡例">
+            <span><i class="ma5-line"></i>MA5</span><span><i class="ma25-line"></i>MA25</span><span><i class="ma100-line"></i>MA100</span><span><i class="fib-line"></i>Fibonacci</span>
+          </div>
           <div class="stock-chart">
             <canvas id="stock-chart"></canvas>
           </div>
+          <p class="chart-hint" data-language>クリック・タップで数値を表示</p>
           <p class="stock-chart-status" id="stock-chart-status">株価取得なし</p>
+          <p class="stock-chart-status" id="stock-indicator-status"></p>
         </section>
 
         <section class="panel documents-panel" id="documents">
@@ -265,7 +318,7 @@
               target="_blank"
               rel="noreferrer"
             >
-              公式IRサイト <span>↗</span>
+              <span data-language>公式IRサイト</span> <span>↗</span>
             </a>
           </div>
           <div class="table-wrap">
@@ -287,6 +340,25 @@
     </div>
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    <aside class="chart-tooltip" id="chart-tooltip" role="status" aria-live="polite" aria-atomic="true" hidden>
+      <button type="button" class="chart-tooltip-close" id="chart-tooltip-close" aria-label="閉じる">×</button>
+      <div id="chart-tooltip-content"></div>
+    </aside>
+    <p class="sr-only" id="chart-interaction-help" data-language>グラフをクリックまたはタップすると数値が表示されます。キーボードでは左右矢印で項目を選び、Escapeで閉じます。</p>
+    <dialog class="company-request-dialog" id="company-request-dialog" aria-labelledby="company-request-title">
+      <button type="button" class="chart-tooltip-close" id="company-request-close" aria-label="閉じる">×</button>
+      <h2 id="company-request-title" data-language>企業の追加希望</h2>
+      <p data-language>表示してほしい企業を教えてください。確認後に追加を検討します。</p>
+      <form id="company-request-form">
+        <label for="request-company-name" data-language>企業名・必須</label>
+        <input id="request-company-name" name="company_name" required maxlength="120" autocomplete="organization" autofocus />
+        <label for="request-stock-code" data-language>証券コード・任意</label>
+        <input id="request-stock-code" name="stock_code" maxlength="4" pattern="[0-9A-Za-z０-９Ａ-Ｚａ-ｚ]{4}" autocomplete="off" />
+        <button class="refresh-button" id="company-request-submit" type="submit" data-language>追加希望を送信</button>
+        <p id="company-request-status" role="status" aria-live="polite"></p>
+      </form>
+    </dialog>
     <script type="module" src="./app.js"></script>
+    <script type="module" src="./company-requests.js"></script>
   </body>
 </html>

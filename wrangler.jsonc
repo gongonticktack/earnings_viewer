@@ -6,6 +6,13 @@
   "observability": {
     "enabled": true
   },
+  "kv_namespaces": [
+    { "binding": "STOCK_PRICES", "id": "3672855e6ff84bff9899fe8f73f7a737" },
+    { "binding": "IR_DOCUMENTS", "id": "3ce561890a9c4b34aa347c311e62293c" }
+  ],
+  "triggers": {
+    "crons": ["30 7 * * 1-5", "0 10 * * *"]
+  },
   "assets": {
     "directory": ".",
     "binding": "ASSETS",

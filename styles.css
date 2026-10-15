@@ -136,6 +136,30 @@ body::after {
   font-size: 7px;
 }
 
+.flow-mode-control { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin: 16px 0; font-size: 14px; }
+.flow-mode-control select { padding: 10px 12px; border: 1px solid #65583a; border-radius: 8px; background: #24241c; color: #eee8dc; font: inherit; max-width: 100%; }
+.company-request-button {
+  display: block; width: 100%; padding: 16px 12px; margin-top: 8px;
+  border: 1px dashed #a28a53; border-radius: 12px; color: #dbc58c;
+  background: transparent; cursor: pointer; font: inherit; white-space: nowrap;
+}
+.company-request-button:hover { background: #c9ac6120; }
+.company-request-dialog {
+  position: fixed; width: min(460px, calc(100vw - 32px)); max-height: 85dvh;
+  box-sizing: border-box; padding: 30px 24px; border: 1px solid #65583a;
+  border-radius: 18px; color: #eee8dc; background: #191913;
+}
+.company-request-dialog::backdrop { background: #000a; }
+.company-request-dialog h2 { margin: 0 24px 14px 0; font-size: 21px; }
+.company-request-dialog p { line-height: 1.7; font-size: 14px; }
+.company-request-dialog label { display: block; margin: 20px 0 8px; font-size: 14px; }
+.company-request-dialog input {
+  box-sizing: border-box; width: 100%; padding: 12px; font: inherit; font-size: 16px;
+  color: inherit; background: #24241c; border: 1px solid #65583a; border-radius: 8px;
+}
+.company-request-dialog button[type="submit"] { margin-top: 24px; min-height: 44px; }
+.company-request-dialog button:disabled { opacity: .5; cursor: wait; }
+.company-request-dialog :focus-visible, .company-request-button:focus-visible { outline: 2px solid #dbc58c; outline-offset: 3px; }
 .company-switcher {
   display: grid;
   margin-top: 34px;
@@ -258,6 +282,8 @@ body::after {
 
 .topbar {
   margin-bottom: 24px;
+  gap: 20px;
+  flex-wrap: wrap;
 }
 
 h1,
@@ -300,12 +326,40 @@ h3 {
 .topbar-actions {
   display: flex;
   align-items: center;
-  gap: 17px;
+  gap: 10px;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+.topbar-actions .refresh-button {
+  justify-content: center;
+  height: 44px;
+  padding: 0 15px;
+  width: 120px;
+  flex: 0 0 120px;
+  white-space: nowrap;
+  line-height: 1.4;
+}
+
+.topbar-actions .language-button {
+  color: var(--gold);
+  background: transparent;
+}
+
+.topbar-actions .language-button:hover {
+  background: rgba(214, 183, 122, 0.1);
+}
+
+.topbar-actions .refresh-button:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 3px;
 }
 
 .latest-update {
+  display: block;
+  margin-top: 10px;
   color: var(--dim);
-  font: 600 10px/1 var(--font-display);
+  font: 600 10px/1.6 var(--font-display);
   letter-spacing: 0.04em;
 }
 
@@ -583,7 +637,7 @@ select {
 }
 
 .chart-container canvas,
-.waterfall-wrap canvas,
+.sankey-wrap canvas,
 .stock-chart canvas {
   display: block;
   width: 100%;
@@ -660,16 +714,42 @@ select {
 
 .flow-layout {
   display: grid;
-  height: 430px;
+  height: auto;
   margin-top: 19px;
   gap: 20px;
   grid-template-columns: minmax(0, 1fr) minmax(210px, 250px);
 }
 
-.waterfall-wrap {
+.sankey-wrap {
   position: relative;
+  min-width: 0;
+  max-width: 100%;
   min-height: 0;
+  height: 430px;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  border: 1px solid var(--line);
+  border-radius: 6px;
 }
+
+.sankey-wrap canvas {
+  min-width: 0;
+}
+
+.sankey-wrap:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
+.sankey-zoom-button { min-height: 44px; white-space: nowrap; }
+.sankey-help { margin: 12px 0 0; color: var(--muted); font-size: 12px; line-height: 1.8; }
+
+.statement-heading { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; margin-top: 26px; }
+.annual-flow-panel .panel-heading { flex-wrap: wrap; }
+.annual-flow-panel .flow-period { line-height: 1.7; max-width: 100%; overflow-wrap: anywhere; }
+.statement-heading h4 { margin: 0; font-size: 15px; }
+.statement-heading label { color: var(--muted); font-size: 12px; }
+.statement-heading input { accent-color: var(--gold); }
+.statement-heading select { background: var(--panel-strong); color: var(--text); padding: 8px; border: 1px solid var(--line); border-radius: 6px; max-width: 100%; }
+.statement-table { max-height: 480px; overflow: auto; }
+.statement-table th { position: sticky; top: 0; background: var(--panel-strong); }
+.statement-table td:nth-child(2) { text-align: right; font-variant-numeric: tabular-nums; }
 
 .flow-summary {
   display: grid;
@@ -734,6 +814,38 @@ select {
 
 .stock-chart-panel {
   margin-top: 17px;
+}
+
+.live-market {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 12px;
+  border-color: var(--line-strong);
+}
+
+.live-price {
+  font-family: var(--font-display);
+  font-size: clamp(28px, 4vw, 42px);
+  margin-right: 16px;
+}
+
+.live-change { color: var(--green); font-size: 15px; }
+.live-change.negative { color: var(--red); }
+.live-market-meta { text-align: right; color: var(--muted); font-size: 12px; }
+.live-market-meta input { accent-color: var(--gold); }
+.live-market-meta p { margin: 8px 0; }
+.data-status { color: var(--muted); font-size: 12px; line-height: 1.8; margin: 0 0 22px; }
+.live-financial { margin-bottom: 12px; }
+.annual-summary-values { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; margin-top: 16px; }
+.annual-summary-values small { display: block; color: var(--muted); margin-bottom: 8px; }
+.annual-summary-values strong { font-size: clamp(15px, 2vw, 22px); font-family: var(--font-display); }
+
+@media (max-width: 700px) {
+  .live-market { align-items: flex-start; flex-direction: column; }
+  .live-market-meta { text-align: left; }
+  .annual-summary-values { grid-template-columns: 1fr; gap: 12px; }
 }
 
 .stock-chart {
@@ -847,10 +959,10 @@ tbody tr.selected {
 
   .flow-layout {
     height: auto;
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 
-  .waterfall-wrap {
+  .sankey-wrap {
     height: 390px;
   }
 }
@@ -878,6 +990,7 @@ tbody tr.selected {
   .company-button {
     flex: 0 0 auto;
   }
+  .company-request-button { flex: 0 0 auto; width: auto; margin: 0; }
 
   .sidebar-bottom {
     margin-top: 15px;
@@ -894,12 +1007,89 @@ tbody tr.selected {
   }
 
   .topbar-actions {
-    justify-content: space-between;
-    margin-top: 15px;
+    justify-content: flex-end;
+    margin-top: 0;
   }
 
-  .latest-update {
-    font-size: 8px;
+  .documents-panel .panel-heading {
+    flex-wrap: wrap;
+    gap: 16px;
+  }
+
+  .documents-panel .table-wrap {
+    max-height: none;
+    overflow: visible;
+  }
+
+  .documents-panel table {
+    display: block;
+    white-space: normal;
+  }
+
+  .documents-panel thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+
+  .documents-panel tbody {
+    display: grid;
+    gap: 12px;
+  }
+
+  .documents-panel tbody tr {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 12px;
+    padding: 14px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.025);
+  }
+
+  .documents-panel td {
+    min-width: 0;
+    padding: 0;
+    border: 0;
+    text-align: left;
+    font-size: 12px;
+    line-height: 1.7;
+  }
+
+  .documents-panel td:nth-child(3) {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    color: var(--text);
+    font-size: 13px;
+    overflow-wrap: anywhere;
+  }
+
+  .documents-panel td:nth-child(4) {
+    grid-column: 3;
+    grid-row: 1;
+  }
+
+  .documents-panel td[colspan] {
+    grid-column: 1 / -1;
+  }
+
+  .documents-panel .pdf-link {
+    display: inline-flex;
+    min-height: 44px;
+    align-items: center;
+    justify-content: center;
+    padding: 0 12px;
+    border: 1px solid var(--line-strong);
+    border-radius: 6px;
+    white-space: nowrap;
+  }
+
+  .documents-panel .pdf-link:focus-visible {
+    outline: 2px solid var(--gold);
+    outline-offset: 3px;
   }
 
   .hero-panel {
@@ -943,4 +1133,28 @@ tbody tr.selected {
   .legend {
     display: none;
   }
+}
+.original-label { display: block; margin-top: 4px; color: var(--muted, #9b998f); font-size: 11px; }
+html[lang="en"] .metric-card strong { font-size: clamp(20px, 2.5vw, 32px); }
+
+canvas[tabindex] { cursor: pointer; }
+.chart-hint { color: var(--muted); font-size: 11px; margin: 12px 0 0; }
+.stock-indicator-legend { display: flex; flex-wrap: wrap; gap: 12px 18px; margin-top: 14px; font-size: 12px; color: var(--muted); }
+.stock-indicator-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.stock-indicator-legend i { width: 22px; height: 2px; }
+.ma5-line { background: #5bc0eb; }.ma25-line { background: #f2b35c; }.ma100-line { background: #c795ff; }
+.fib-line { border-top: 1px dashed #b7c2cf; }
+canvas[tabindex]:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.chart-tooltip { position: fixed; z-index: 30; width: min(340px, calc(100vw - 24px)); padding: 20px; background: #25241d; border: 1px solid var(--gold-soft); border-radius: 12px; box-shadow: 0 12px 36px #0009; max-height: 70vh; overflow-y: auto; }
+.chart-tooltip[hidden] { display: none; }
+.chart-tooltip-close { float: right; width: 36px; height: 36px; border: 0; border-radius: 6px; color: var(--text); background: #ffffff0d; font-size: 22px; cursor: pointer; }
+.chart-tooltip h4 { margin: 0 40px 10px 0; font-size: 15px; line-height: 1.6; overflow-wrap: anywhere; }
+.chart-tooltip p { margin: 6px 0 14px; font-size: 11px; line-height: 1.7; color: var(--muted); }
+.chart-tooltip dl { margin: 0; }
+.chart-tooltip dt { margin-top: 12px; font-size: 11px; color: var(--muted); }
+.chart-tooltip dd { margin: 4px 0 0; font-size: 15px; font-weight: 700; line-height: 1.6; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+@media (max-width: 740px) {
+  .chart-tooltip { left: 12px !important; right: 12px; bottom: 14px; top: auto !important; width: auto; max-height: 45vh; padding: 16px; }
+  .chart-tooltip-close { width: 44px; height: 44px; }
 }
