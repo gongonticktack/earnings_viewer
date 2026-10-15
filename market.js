@@ -80,7 +80,7 @@ export function mergeFinancialResults(existing, payload, companyCode) {
   if (!baseDate) return existing;
   const [year, month] = baseDate.split("-").map(Number);
   const baseQuarter = anchor?.quarter ?? 4;
-  const baseYear = anchor?.fiscalYear ?? fiscalYearFromPeriod(baseDate, 4);
+  const baseYear = fiscalYearFromPeriod(baseDate, baseQuarter);
   const additions = payload.results.filter((row) => !anchor || row.periodEnd > anchor.periodEnd)
     .flatMap((row) => {
       const [rowYear, rowMonth] = row.periodEnd.split("-").map(Number);

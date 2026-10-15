@@ -3,9 +3,18 @@ import { readFile } from "node:fs/promises";
 import { test } from "node:test";
 import { buildCashFlow } from './cash-flow.js';
 import { quarterlyStatements } from './financial-reports.js';
+import { fiscalYearFromPeriod } from './market.js';
 
 const manifest = JSON.parse(await readFile(new URL("./statement-data.json", import.meta.url), "utf8"));
 const verified = JSON.parse(await readFile(new URL("./test-fixtures/official-statements.json", import.meta.url), "utf8"));
+
+test("全保存原本の年度・四半期は公表時期ではなく実績期間に一致する", () => {
+  for (const report of Object.values(manifest.reportsByCompany).flat()) {
+    assert.equal(report.fiscalYear, fiscalYearFromPeriod(report.periodEnd, report.quarter), report.sourceUrl);
+    assert.equal(report.quarter, report.months / 3, report.sourceUrl);
+    assert.equal(Number(report.periodStart.slice(0,4)), report.fiscalYear, report.sourceUrl);
+  }
+});
 
 test("2022年度の13社の4四半期は出典付きの原本から作られ、未取得企業の値は作らない", () => {
   const companies=["toyota","mufg","softbank-group","fast-retailing","advantest","smfg","mizuho","keyence","itochu","shin-etsu","mitsubishi-corp","hitachi","ntt"];

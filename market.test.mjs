@@ -48,7 +48,7 @@ test("8月年度末と年をまたぐ四半期も正しく扱う", () => {
   const existing = [{ periodEnd: "2025-08-31", fiscalYear: 2025, quarter: 4 }];
   const data = { results: [{ periodEnd: "2026-02-28", operatingIncome: null, revenue: 10 }] };
   const row = mergeFinancialResults(existing, data, "fast-retailing")[1];
-  assert.equal(row.fiscalYear, 2026);
+  assert.equal(row.fiscalYear, 2025);
   assert.equal(row.quarter, 2);
   assert.equal(row.operatingCost, null);
 });

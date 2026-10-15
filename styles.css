@@ -970,6 +970,7 @@ tbody tr.selected {
 @media (max-width: 740px) {
   .app-shell {
     display: block;
+    position: relative;
   }
 
   .sidebar {
@@ -977,7 +978,7 @@ tbody tr.selected {
     display: block;
     width: 100%;
     height: auto;
-    padding: 17px 18px;
+    padding: 76px 18px 17px;
   }
 
   .company-switcher {
@@ -1007,8 +1008,11 @@ tbody tr.selected {
   }
 
   .topbar-actions {
+    position: absolute;
+    top: 16px;
+    right: 15px;
     justify-content: flex-end;
-    margin-top: 0;
+    margin: 0;
   }
 
   .documents-panel .panel-heading {

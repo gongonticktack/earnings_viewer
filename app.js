@@ -1,6 +1,6 @@
 import { mergeFinancialResults, fiscalYearFromPeriod, fiscalPeriodLabel } from "./market.js";
 import { buildIncomeFlow, sankeyHubSize } from "./sankey.js";
-import { sortIrDocuments } from "./report-metadata.js";
+import { sortIrDocuments, officialDocumentPeriod } from "./report-metadata.js";
 import { buildCashFlow } from "./cash-flow.js";
 import { extractStatement, mergeOfficialStatements } from "./financial-reports.js";
 import { translateText, readLanguage, saveLanguage } from "./i18n.js";
@@ -413,8 +413,9 @@ function buildFallbackDocuments(resultsByCompany) {
       title: `FY${row.fiscalYear} Q${row.quarter} financial results`,
       url: row.sourceUrl,
       sourceName: "official_ir",
-      publishedAt: row.periodEnd,
-    }])).values()].sort((a, b) => b.publishedAt.localeCompare(a.publishedAt)),
+      periodEnd: row.periodEnd,
+      publishedAt: null,
+    }])).values()].sort((a, b) => b.periodEnd.localeCompare(a.periodEnd)),
   ]));
 }
 
@@ -780,7 +781,10 @@ function renderDocuments() {
     elements.documentsBody.innerHTML = t('<tr><td colspan="4">公式IRサイトでPDF資料を取得できませんでした。</td></tr>');
     return;
   }
-  elements.documentsBody.innerHTML = sortIrDocuments(documents, state.companyCode)
+  const periods = documents.map((document) => ({ ...document,
+    ...officialDocumentPeriod(document, state.companyCode, state.officialReportsByCompany[state.companyCode] ?? []),
+  }));
+  elements.documentsBody.innerHTML = sortIrDocuments(periods, state.companyCode)
     .map(
       (document) => `
         <tr>
@@ -794,37 +798,24 @@ function renderDocuments() {
     .join("");
 }
 
+/**
+ * 概要: 照合済み対象期間から資料の開始年度を表示します。
+ * 引数: document - 資料情報。
+ * 戻り値: 年度ラベル。不明ならダッシュ。
+ */
 function officialDocumentFiscalYear(document) {
-  if (document.fiscalYear) return `FY${document.fiscalYear}`;
-  const value = `${document.title} ${document.url}`;
-  const mufgMatch = value.match(/summary(\d{2})(?:03|06|09|12)_ja\.pdf/i);
-  if (mufgMatch) return `FY20${mufgMatch[1]}`;
-
-  const hitachiMatch = value.match(/\/(\d{4})_(?:[1-3]Q|An)\.pdf/i);
-  if (hitachiMatch) return `FY${Number(hitachiMatch[1]) + 1}`;
-
-  const fastRetailingMatch = value.match(/tanshin(\d{4})\d{2}_[1-4]q\.pdf/i);
-  if (fastRetailingMatch) return `FY${fastRetailingMatch[1]}`;
-
-  const match = value.match(/\bfy\s*([12]\d{3}|[0-9]{2})\b/i)
-    ?? value.match(/(?:^|[^\d])([12]\d{3})(?:[^\d]|$)/);
-  if (!match) return "—";
-  const year = Number(match[1]);
-  return `FY${year < 100 ? 2000 + year : year}`;
+  const { fiscalYear } = officialDocumentPeriod(document, state.companyCode, state.officialReportsByCompany[state.companyCode] ?? []);
+  return fiscalYear ? `FY${fiscalYear}` : "—";
 }
 
+/**
+ * 概要: 公表時期に左右されず、原本の対象四半期を表示します。
+ * 引数: document - 資料情報。
+ * 戻り値: 四半期ラベル。不明ならダッシュ。
+ */
 function officialDocumentQuarter(document) {
-  if (document.quarter) return `Q${document.quarter}`;
-  const value = `${document.title} ${document.url}`;
-  const mufgMatch = value.match(/summary\d{2}(03|06|09|12)_ja\.pdf/i);
-  if (mufgMatch) return { "03": "Q4", "06": "Q1", "09": "Q2", "12": "Q3" }[mufgMatch[1]];
-
-  if (/_An\.pdf/i.test(value) || /_fy_01\.pdf/i.test(value)) return "Q4";
-
-  const match = value.match(/q([1-4])/i)
-    ?? value.match(/([1-4])q/i)
-    ?? value.match(/第\s*([1-4])\s*四半期/);
-  return match ? `Q${match[1]}` : "—";
+  const { quarter } = officialDocumentPeriod(document, state.companyCode, state.officialReportsByCompany[state.companyCode] ?? []);
+  return quarter ? `Q${quarter}` : "—";
 }
 
 /**
@@ -1760,7 +1751,8 @@ async function loadDatabaseData() {
         title: `FY${row.fiscalYear} Q${row.quarter} financial results`,
         url: row.sourceUrl,
         sourceName: "official_ir",
-        publishedAt: row.periodEnd,
+        periodEnd: row.periodEnd,
+        publishedAt: null,
         updatedAt: row.updatedAt,
       });
     });

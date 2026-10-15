@@ -4,7 +4,7 @@ import { readFile } from "node:fs/promises";
 import vm from "node:vm";
 import { mergeFinancialResults, fiscalYearFromPeriod, fiscalPeriodLabel } from "./market.js";
 import { buildIncomeFlow, sankeyHubSize } from "./sankey.js";
-import { sortIrDocuments } from "./report-metadata.js";
+import { sortIrDocuments, officialDocumentPeriod } from "./report-metadata.js";
 import { buildCashFlow } from "./cash-flow.js";
 import { mergeOfficialStatements } from "./financial-reports.js";
 import { translateText, readLanguage, saveLanguage } from "./i18n.js";
@@ -15,7 +15,7 @@ const source = (await readFile(new URL("./app.js", import.meta.url), "utf8"))
   .replaceAll("\r\n", "\n")
   .replace('import { mergeFinancialResults, fiscalYearFromPeriod, fiscalPeriodLabel } from "./market.js";', "")
   .replace('import { buildIncomeFlow, sankeyHubSize } from "./sankey.js";', "")
-  .replace('import { sortIrDocuments } from "./report-metadata.js";', "")
+  .replace('import { sortIrDocuments, officialDocumentPeriod } from "./report-metadata.js";', "")
   .replace('import { buildCashFlow } from "./cash-flow.js";', "")
   .replace('import { extractStatement, mergeOfficialStatements } from "./financial-reports.js";', "")
   .replace('import { translateText, readLanguage, saveLanguage } from "./i18n.js";', "")
@@ -172,7 +172,7 @@ async function setup({ chartWidth = 800, ratio = 1, nativeTimeout = true } = {})
   };
   const sandbox = vm.createContext({ document, fetch, URL, Response, AbortSignal: nativeTimeout ? AbortSignal : {}, AbortController, console,
     mergeFinancialResults, fiscalYearFromPeriod, fiscalPeriodLabel, mergeOfficialStatements, translateText, readLanguage, saveLanguage, chartPoint, hitChart, stockIndicators,
-    extractStatement: async () => null, buildIncomeFlow, sankeyHubSize, sortIrDocuments, buildCashFlow, window: { devicePixelRatio: ratio, setTimeout() {}, addEventListener() {},
+    extractStatement: async () => null, buildIncomeFlow, sankeyHubSize, sortIrDocuments, officialDocumentPeriod, buildCashFlow, window: { devicePixelRatio: ratio, setTimeout() {}, addEventListener() {},
       setInterval(fn, ms) { timers.set(ms, fn); } } });
   const api = await vm.runInContext(`(async () => { ${source}\nreturn {state, elements, refreshCompany, refreshQuote, applyOfficialStatements, loadOfficialStatements, loadOfficialIrDocuments, renderDocuments, chartModels}; })()`, sandbox);
   return { ...api, rows, nodes, timers, document, calls, buttons, setHandler(fn) { handler = fn; } };
@@ -214,6 +214,21 @@ test("資料の追加取得後と描画時のどちらも、新しい資料が�
   app.state.officialIrDocumentsByCompany.toyota.reverse();
   app.renderDocuments();
   assert.equal(app.elements.documentsBody.innerHTML,html);
+});
+
+test("資料一覧は遅れて公表された通期も原本の対象年度・四半期を優先する", async () => {
+  const app = await setup();
+  await tick();
+  const url = "https://official.test/annual.pdf";
+  app.state.officialIrDocumentsByCompany.toyota = [
+    {url,title:"2026年5月8日 決算資料",fiscalYear:2026,quarter:1},
+    {url:"https://official.test/news/2026/unknown.pdf",title:"2026年8月4日 決算資料"},
+  ];
+  app.state.officialReportsByCompany.toyota = [{sourceUrl:url,periodEnd:"2026-03-31",fiscalYear:2025,quarter:4}];
+  app.renderDocuments();
+  assert.match(app.elements.documentsBody.innerHTML, /FY2025<\/td>\s*<td>Q4/);
+  assert.doesNotMatch(app.elements.documentsBody.innerHTML, /FY2026/);
+  assert.match(app.elements.documentsBody.innerHTML, /<td>—<\/td>\s*<td>—/);
 });
 
 test("スマホのサンキーは画面幅に収まり、拡大・全体表示を往復しても損益と選択期を保つ", async () => {

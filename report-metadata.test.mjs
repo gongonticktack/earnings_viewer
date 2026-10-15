@@ -1,6 +1,32 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { selectStatementDocuments, sortIrDocuments } from "./report-metadata.js";
+import { selectStatementDocuments, sortIrDocuments, officialDocumentPeriod } from "./report-metadata.js";
+
+test("公表が翌期・翌年でも対象期間の開始年度と四半期を維持する", () => {
+  const cases = [
+    ["toyota", "2027_1q_summary_jp.pdf", "第1四半期決算情報 2026年8月4日", 2026, 1, "2026-06-30"],
+    ["toyota", "2026_4q_summary_jp.pdf", "決算情報 2026年5月8日", 2025, 4, "2026-03-31"],
+    ["fast-retailing", "tanshin202608_1q.pdf", "2026年1月8日 決算短信", 2025, 1, "2025-11-30"],
+    ["mufg", "summary2603_ja.pdf", "2026年5月 決算短信", 2025, 4, "2026-03-31"],
+    ["hitachi", "2025_An.pdf", "決算短信 2026年4月", 2025, 4, "2026-03-31"],
+    ["tokyo-electron", "fy26q3tanshin.pdf", "2026年2月 決算短信", 2025, 3, "2025-12-31"],
+    ["toyota", "annual.pdf", "２０２６年３月期 決算短信", 2025, 4, "2026-03-31"],
+    ["fast-retailing", "half.pdf", "2026年8月期 中間決算短信", 2025, 2, "2026-02-28"],
+  ];
+  for (const [company, filename, title, fiscalYear, quarter, periodEnd] of cases) {
+    assert.deepEqual(officialDocumentPeriod({url:`https://official.test/${filename}`,title,publishedAt:"2026-10-16"},company),
+      {fiscalYear,quarter,periodEnd},filename);
+  }
+  assert.deepEqual(officialDocumentPeriod({title:"2026年8月4日 決算資料",url:"https://official.test/news/2026/doc.pdf"},"toyota"),
+    {fiscalYear:null,quarter:null,periodEnd:null});
+});
+
+test("同じ原本の照合済み期間をDBの年度より優先し、20日締めも保持する", () => {
+  const document={url:"https://official.test/doc.pdf",title:"決算短信",fiscalYear:2026,quarter:1};
+  assert.deepEqual(officialDocumentPeriod(document,"keyence",[
+    {sourceUrl:document.url,periodEnd:"2026-03-20",fiscalYear:2025,quarter:4},
+  ]),{fiscalYear:2025,quarter:4,periodEnd:"2026-03-20"});
+});
 
 test("取得元・取得順・更新日時によらず公表日と年度四半期で新しい資料を上にする", () => {
   const documents=[
